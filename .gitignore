@@ -134,8 +134,4 @@ dmypy.json
 
 # Project specific
 .gitarchive
-repos.conf
-prs.json
-discord_token.txt
-github_token.txt
-updateTracking.txt
+frii_update.ini
