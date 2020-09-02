@@ -16,7 +16,7 @@ class FriiUpdate(commands.Bot):
     # Licensed under apache 2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
         self.channel = await self.fetch_channel(int(config["Config"]["Channel ID"]))
-        await self.channel.send(f"<@&{self.role} an unhandled exception has occurred")
+        await self.channel.send(f"<@&{self.role}> an unhandled exception has occurred")
         exc = getattr(exception, 'original', exception)
         msg = "".join(format_exception(type(exc), exc, exc.__traceback__))
         error_paginator = commands.Paginator()
