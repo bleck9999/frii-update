@@ -9,17 +9,17 @@ from github import Github
 
 # format for entry: [Repo Path (str), Embed Colour (discord.Color)]
 repos = [
-    #["/media/blecc/storageBecause/switchhax2/test-repo-tm", discord.Color(0xffff00)]
-    ["/media/blecc/storageBecause/switchhax2/Atmosphere", discord.Color(0x00a6ff)],
-    ["/media/blecc/storageBecause/switchhax2/hekate", discord.Color(0xff0000)],
-    ["/media/blecc/storageBecause/switchhax2/kurisu", discord.Color(0x8000ff)],
-    ["/media/blecc/storageBecause/switchhax2/switch-guide", discord.Color(0x272B30)],
-    ["/media/blecc/storageBecause/switchhax2/Lockpick_RCM", discord.Color(0xffff00)],
-    ["/media/blecc/storageBecause/switchhax2/emmchaccgen", discord.Color(0x005200)],
-    ["/media/blecc/storageBecause/switchhax2/GUIModManager", discord.Color(0x00ff00)],
-    ["/media/blecc/storageBecause/switchhax2/TegraExplorer", discord.Color(0xba5d00)],
-    ["/media/blecc/storageBecause/switchhax2/TegraScript", discord.Color(0xba5d00)],
-    ["/media/blecc/storageBecause/switchhax2/themezer-nx", discord.Color(0x27aad6)]
+    ["/media/blecc/storageBecause/switchhax2/test-repo-tm", discord.Color(0xffff00)]
+    # ["/media/blecc/storageBecause/switchhax2/Atmosphere", discord.Color(0x00a6ff)],
+    # ["/media/blecc/storageBecause/switchhax2/hekate", discord.Color(0xff0000)],
+    # ["/media/blecc/storageBecause/switchhax2/kurisu", discord.Color(0x8000ff)],
+    # ["/media/blecc/storageBecause/switchhax2/switch-guide", discord.Color(0x272B30)],
+    # ["/media/blecc/storageBecause/switchhax2/Lockpick_RCM", discord.Color(0xffff00)],
+    # ["/media/blecc/storageBecause/switchhax2/emmchaccgen", discord.Color(0x005200)],
+    # ["/media/blecc/storageBecause/switchhax2/GUIModManager", discord.Color(0x00ff00)],
+    # ["/media/blecc/storageBecause/switchhax2/TegraExplorer", discord.Color(0xba5d00)],
+    # ["/media/blecc/storageBecause/switchhax2/TegraScript", discord.Color(0xba5d00)],
+    # ["/media/blecc/storageBecause/switchhax2/themezer-nx", discord.Color(0x27aad6)]
 ]
 
 
@@ -44,7 +44,7 @@ class Loop(commands.Cog):
         conf.read("frii_update.ini")
         self.bot = bot
         self.channel = int(conf["Config"]["Channel ID"])
-        self.role = int(conf["Config"]["Channel ID"])
+        self.role = int(conf["Config"]["Role ID"])
         self.ghAPI = Github(conf["Tokens"]["Github"])
 
         # asyncio.run(self.updateLoop())
@@ -59,33 +59,33 @@ class Loop(commands.Cog):
                 # NEW_COMMITS = {}
                 origin = repo.remotes["origin"]
                 ghRepo = self.ghAPI.get_repo(f"{origin.url[19:] if origin.url[-1] != '/' else origin.url[19:-1]}")
+                branches = [branch.name for branch in repo.branches]
 
-                fetch = repo.git.fetch("-n", "-p")
-                if "[new branch]" in fetch:
-                    for branch in origin.refs:
-                        if branch.remote_head == "HEAD":
-                            pass
-                        else:
-                            repo.git.branch("--track", branch.remote_head, branch.name)
-                            if not ponged:
-                                await channel.send(f"<@&{self.role}> New branch(es) detected!")
-                                ponged = True
-                            await channel.send(f"{branch.remote_head} on {origin.url.split(sep='/')[4]}")
+                repo.git.fetch("-p")
 
-                if "[deleted]" in fetch:
-                    for branch in repo.branches:
-                        if branch.tracking_branch() not in origin.refs:
-                            if not ponged:
-                                await channel.send(f"<@&{self.role}> Branch(es) deleted!")
-                                ponged = True
-                            await channel.send(f"{branch.remote_head} on {origin.url.split(sep='/')[4]}")
+                for branch in origin.refs:
+                    if branch.remote_head == "HEAD" or branch.remote_head in branches:
+                        pass
+                    else:
+                        repo.git.branch("--track", branch.remote_head, branch.name)
+                        if not ponged:
+                            await channel.send(f"<@&{self.role}> New branch(es) detected!")
+                            ponged = True
+                        await channel.send(f"{branch.remote_head} on {origin.url.split(sep='/')[4]}")
 
-                            if repo.active_branch == branch:
-                                if branch != repo.branches[0]:
-                                    repo.git.checkout(repo.branches[0].name)
-                                else:
-                                    repo.git.checkout(repo.branches[1].name)
-                            repo.git.branch("-D", branch.name)
+                for branch in repo.branches:
+                    if branch.tracking_branch() not in origin.refs:
+                        if not ponged:
+                            await channel.send(f"<@&{self.role}> Branch(es) deleted!")
+                            ponged = True
+                        await channel.send(f"{branch.name} on {origin.url.split(sep='/')[4]}")
+
+                        if repo.active_branch == branch:
+                            if branch != repo.branches[0]:
+                                repo.git.checkout(repo.branches[0].name)
+                            else:
+                                repo.git.checkout(repo.branches[1].name)
+                        repo.git.branch("-D", branch.name)
 
                 for branch in repo.branches:
                     print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {origin.url.split(sep='/')[4]} - {branch.name}")
@@ -93,13 +93,13 @@ class Loop(commands.Cog):
                     repo.git.checkout(branch.name)
                     repo.git.pull()
                     Clist = list(repo.iter_commits(branch.name))
-
-                    for index in range(occ, len(Clist)):
+                    ncc = len(Clist) - occ
+                    for index in range(ncc):
                         commit = Clist[index]
                         author = ghRepo.get_commit(commit.hexsha).author
                         if not ponged:
                             await channel.send(
-                                f"<@&{self.role}> New commit{'s' if len(list(Clist)) - occ > 1 else ''} detected!")
+                                f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
                             ponged = True
 
                         await send_embed(channel,
