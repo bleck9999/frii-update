@@ -1,9 +1,14 @@
 welcome to bootleg github webhook for discord
 
 i dont expect people to actually use this but i mean it works™
-if you want to use it for whatever reason then use the pickle module to dump a list of repos to track into a file called "repos.conf" in the same directory as bot.py (format is above the assignment of `repos` in cogs/friiUpdate.py), put the tokens somewhere then run .start once the bot is online
-by default it checks every 900s (15 minutes), if you want to change this change the sleepTime variable in friiUpdate.py to a different number (you can also try and use .interval/.sleepTime but good luck with that)
 
-tokens are read from a file in the same directory as bot.py called "github_token.txt" and "discord_token.txt", the parsers are nonexistent so if it doesnt work ~~fix them and pr it~~ just put the tokens in the .py files or something i dont know 
-
-it doesnt currently track issues, tags or releases, it also probably doesnt work with the same instance in multiple servers.
+New™ updated instructions:
+1. clone this repo
+2. make a file called "repos.json" and one called "frii_update.ini"
+3. in frii_update.ini, make a section named `Tokens` and one named `Config`
+4. under the `Tokens` section, assign `Github` to a github api token, and `Discord` to your discord bot's token
+5. under the `Config` section, assign `Role ID` to the id of the role you want the bot to ping and `Channel ID` to the id of the channel you want the bot to send messages
+6. in repos.json, put a nested list of `["path/to/cloned/repo",colour integer]`. You will need one of these lists for each repo you want to track
+7. install the dependencies (you can do this with `pip install -r requirements.txt`)
+8. run the bot
+9. send `.start` in a channel the bot can see 
