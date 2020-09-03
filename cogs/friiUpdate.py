@@ -8,20 +8,6 @@ import time
 from discord.ext import commands
 from github import Github
 
-async def send_embed(channel, title, url, description, datemsg, date, author, author_url, thumbnail, i):
-    embed = discord.Embed(title=title, color=repos[i][1])
-    embed.set_author(name=author, url=author_url)
-    embed.set_thumbnail(url=thumbnail)
-    embed.url = url
-    if len(description) >= 2000:
-        # char limit for description is 2048
-        # so leave 48 chars for the date
-        description = description[:1997] + "..."
-    else:
-        description = description
-    embed.description = description + "\n" + datemsg + str(date)
-    await channel.send(embed=embed)
-
 
 class Loop(commands.Cog):
     def __init__(self, bot):
@@ -32,20 +18,34 @@ class Loop(commands.Cog):
         self.role = int(conf["Config"]["Role ID"])
         self.ghAPI = Github(conf["Tokens"]["Github"])
 
-        with open("repos.json","r") as j:
+        with open("repos.json", "r") as j:
             self.repos = json.load(j)
             for i in self.repos:
                 i[1] = discord.Color(i[1])
 
         # asyncio.run(self.updateLoop())
 
+    async def send_embed(self, channel, title, url, description, datemsg, date, author, author_url, thumbnail, i):
+        embed = discord.Embed(title=title, color=self.repos[i][1])
+        embed.set_author(name=author, url=author_url)
+        embed.set_thumbnail(url=thumbnail)
+        embed.url = url
+        if len(description) >= 2000:
+            # char limit for description is 2048
+            # so leave 48 chars for the date
+            description = description[:1997] + "..."
+        else:
+            description = description
+        embed.description = description + "\n" + datemsg + str(date)
+        await channel.send(embed=embed)
+
     async def updateLoop(self):
         await self.bot.wait_until_ready()
         channel = await self.bot.fetch_channel(self.channel)
         while True:
             ponged = False
-            for i in range(len(repos)):
-                repo = git.Repo(repos[i][0])
+            for i in range(len(self.repos)):
+                repo = git.Repo(self.repos[i][0])
                 # NEW_COMMITS = {}
                 origin = repo.remotes["origin"]
                 ghRepo = self.ghAPI.get_repo(f"{origin.url[19:] if origin.url[-1] != '/' else origin.url[19:-1]}")
@@ -78,7 +78,8 @@ class Loop(commands.Cog):
                         repo.git.branch("-D", branch.name)
 
                 for branch in repo.branches:
-                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {origin.url.split(sep='/')[4]} - {branch.name}")
+                    print(
+                        f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {origin.url.split(sep='/')[4]} - {branch.name}")
                     occ = len(list(repo.iter_commits(branch.name)))  # old commit count
                     repo.git.checkout(branch.name)
                     repo.git.pull()
@@ -92,17 +93,17 @@ class Loop(commands.Cog):
                                 f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
                             ponged = True
 
-                        await send_embed(channel,
-                                         f"{origin.url.split(sep='/')[4]}: {commit.hexsha} on branch {branch.name}",
-                                         f"{origin.url}/commit/{commit.hexsha}",
-                                         commit.message,
-                                         "Committed on ",
-                                         time.asctime(time.gmtime(commit.committed_date)),
-                                         author.login,
-                                         author.html_url,
-                                         author.avatar_url,
-                                         i
-                                         )
+                        await self.send_embed(channel,
+                                              f"{origin.url.split(sep='/')[4]}: {commit.hexsha} on branch {branch.name}",
+                                              f"{origin.url}/commit/{commit.hexsha}",
+                                              commit.message,
+                                              "Committed on ",
+                                              time.asctime(time.gmtime(commit.committed_date)),
+                                              author.login,
+                                              author.html_url,
+                                              author.avatar_url,
+                                              i
+                                              )
 
             await asyncio.sleep(900)
 
