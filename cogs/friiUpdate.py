@@ -3,25 +3,10 @@ import configparser
 import datetime
 import discord
 import git
+import json
 import time
 from discord.ext import commands
 from github import Github
-
-# format for entry: [Repo Path (str), Embed Colour (discord.Color)]
-repos = [
-    ["/media/blecc/storageBecause/switchhax2/test-repo-tm", discord.Color(0xffff00)]
-    # ["/media/blecc/storageBecause/switchhax2/Atmosphere", discord.Color(0x00a6ff)],
-    # ["/media/blecc/storageBecause/switchhax2/hekate", discord.Color(0xff0000)],
-    # ["/media/blecc/storageBecause/switchhax2/kurisu", discord.Color(0x8000ff)],
-    # ["/media/blecc/storageBecause/switchhax2/switch-guide", discord.Color(0x272B30)],
-    # ["/media/blecc/storageBecause/switchhax2/Lockpick_RCM", discord.Color(0xffff00)],
-    # ["/media/blecc/storageBecause/switchhax2/emmchaccgen", discord.Color(0x005200)],
-    # ["/media/blecc/storageBecause/switchhax2/GUIModManager", discord.Color(0x00ff00)],
-    # ["/media/blecc/storageBecause/switchhax2/TegraExplorer", discord.Color(0xba5d00)],
-    # ["/media/blecc/storageBecause/switchhax2/TegraScript", discord.Color(0xba5d00)],
-    # ["/media/blecc/storageBecause/switchhax2/themezer-nx", discord.Color(0x27aad6)]
-]
-
 
 async def send_embed(channel, title, url, description, datemsg, date, author, author_url, thumbnail, i):
     embed = discord.Embed(title=title, color=repos[i][1])
@@ -46,6 +31,11 @@ class Loop(commands.Cog):
         self.channel = int(conf["Config"]["Channel ID"])
         self.role = int(conf["Config"]["Role ID"])
         self.ghAPI = Github(conf["Tokens"]["Github"])
+
+        with open("repos.json","r") as j:
+            self.repos = json.load(j)
+            for i in self.repos:
+                i[1] = discord.Color(i[1])
 
         # asyncio.run(self.updateLoop())
 
