@@ -1,22 +1,23 @@
 import asyncio
 import configparser
 import datetime
-import discord
-import git
 import json
 import time
+
+import discord
+import git
 from discord.ext import commands
 from github import Github
 
 
 class Loop(commands.Cog):
     def __init__(self, bot):
-        conf = configparser.ConfigParser()
-        conf.read("frii_update.ini")
+        self.conf = configparser.ConfigParser()
+        self.conf.read("frii_update.ini")
         self.bot = bot
-        self.channel = int(conf["Config"]["Channel ID"])
-        self.role = int(conf["Config"]["Role ID"])
-        self.ghAPI = Github(conf["Tokens"]["Github"])
+        self.channel = int(self.conf["Config"]["Channel ID"])
+        self.role = int(self.conf["Config"]["Role ID"])
+        self.ghAPI = Github(self.conf["Tokens"]["Github"])
 
         with open("repos.json", "r") as j:
             self.repos = json.load(j)
@@ -42,6 +43,10 @@ class Loop(commands.Cog):
     async def updateLoop(self):
         await self.bot.wait_until_ready()
         channel = await self.bot.fetch_channel(self.channel)
+        if "Last_Checked" in self.conf["Config"].keys():
+            lastcheck = self.conf["Config"]["Last_Checked"]
+        else:
+            lastcheck = datetime.now
         while True:
             ponged = False
             for i in range(len(self.repos)):
@@ -50,6 +55,7 @@ class Loop(commands.Cog):
                 origin = repo.remotes["origin"]
                 ghRepo = self.ghAPI.get_repo(f"{origin.url[19:] if origin.url[-1] != '/' else origin.url[19:-1]}")
                 branches = [branch.name for branch in repo.branches]
+                repoName = origin.url.split(sep='/')[4]
 
                 repo.git.fetch("-p")
 
@@ -61,14 +67,14 @@ class Loop(commands.Cog):
                         if not ponged:
                             await channel.send(f"<@&{self.role}> New branch(es) detected!")
                             ponged = True
-                        await channel.send(f"{branch.remote_head} on {origin.url.split(sep='/')[4]}")
+                        await channel.send(f"{branch.remote_head} on {repoName}")
 
                 for branch in repo.branches:
                     if branch.tracking_branch() not in origin.refs:
                         if not ponged:
                             await channel.send(f"<@&{self.role}> Branch(es) deleted!")
                             ponged = True
-                        await channel.send(f"{branch.name} on {origin.url.split(sep='/')[4]}")
+                        await channel.send(f"{branch.name} on {repoName}")
 
                         if repo.active_branch == branch:
                             if branch != repo.branches[0]:
@@ -77,9 +83,8 @@ class Loop(commands.Cog):
                                 repo.git.checkout(repo.branches[1].name)
                         repo.git.branch("-D", branch.name)
 
-                for branch in repo.branches:
                     print(
-                        f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {origin.url.split(sep='/')[4]} - {branch.name}")
+                        f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
                     occ = len(list(repo.iter_commits(branch.name)))  # old commit count
                     repo.git.checkout(branch.name)
                     repo.git.pull()
@@ -94,7 +99,7 @@ class Loop(commands.Cog):
                             ponged = True
 
                         await self.send_embed(channel,
-                                              f"{origin.url.split(sep='/')[4]}: {commit.hexsha} on branch {branch.name}",
+                                              f"{repoName}: {commit.hexsha} on branch {branch.name}",
                                               f"{origin.url}/commit/{commit.hexsha}",
                                               commit.message,
                                               "Committed on ",
@@ -105,6 +110,48 @@ class Loop(commands.Cog):
                                               i
                                               )
 
+                for pull in ghRepo.get_pulls():
+                    if pull.created_at.hour > lastcheck:
+                        if not ponged:
+                            await self.channel.send(f"<@&{self.role}> New pr(s) detected!")
+                            ponged = True
+
+                        await self.send_embed(self.channel,
+                                              f"{repoName}: {pull.title} (#{pull.number})",
+                                              pull.html_url,
+                                              pull.body,
+                                              "Opened on: ",
+                                              pull.created_at,
+                                              pull.user.login,
+                                              pull.user.html_url,
+                                              pull.user.avatar_url,
+                                              i
+                                              )
+
+                    for comment in pull.get_issue_comments():
+                        if comment.created_at > lastcheck:
+                            await self.send_embed(self.channel,
+                                                  f"{repoName} - New comment on pull #{pull.number}",
+                                                  comment.html_url,
+                                                  comment.body,
+                                                  "Commented on: ",
+                                                  comment.created_at,
+                                                  comment.user.login,
+                                                  comment.user.html_url,
+                                                  comment.user.avatar_url,
+                                                  i
+                                                  )
+
+                for pull in ghRepo.get_pulls(state="closed"):
+                    if pull.merged and pull.merged_at.hour > lastcheck:
+                        await self.channel.send(
+                            f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
+                    elif pull.closed_at.hour > lastcheck:
+                        await self.channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+
+            # this way pulls dont get re-detected every time the bot restarts
+            self.conf["Config"]["Last_Checked"] = lastcheck
+            lastcheck = datetime.now().hour
             await asyncio.sleep(900)
 
     @commands.command(aliases=("start", "run"))
