@@ -1,8 +1,8 @@
 import asyncio
 import configparser
-import datetime
 import json
 import time
+from datetime import datetime, timezone
 
 import discord
 import git
@@ -46,7 +46,7 @@ class Loop(commands.Cog):
         if "Last_Checked" in self.conf["Config"].keys():
             lastcheck = self.conf["Config"]["Last_Checked"]
         else:
-            lastcheck = datetime.now
+            lastcheck = datetime.now()
         while True:
             ponged = False
             for i in range(len(self.repos)):
@@ -84,7 +84,7 @@ class Loop(commands.Cog):
                         repo.git.branch("-D", branch.name)
 
                     print(
-                        f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
+                        f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
                     occ = len(list(repo.iter_commits(branch.name)))  # old commit count
                     repo.git.checkout(branch.name)
                     repo.git.pull()
@@ -111,12 +111,12 @@ class Loop(commands.Cog):
                                               )
 
                 for pull in ghRepo.get_pulls():
-                    if pull.created_at.hour > lastcheck:
+                    if pull.created_at > lastcheck:
                         if not ponged:
-                            await self.channel.send(f"<@&{self.role}> New pr(s) detected!")
+                            await channel.send(f"<@&{self.role}> New pr(s) detected!")
                             ponged = True
 
-                        await self.send_embed(self.channel,
+                        await self.send_embed(channel,
                                               f"{repoName}: {pull.title} (#{pull.number})",
                                               pull.html_url,
                                               pull.body,
@@ -130,7 +130,7 @@ class Loop(commands.Cog):
 
                     for comment in pull.get_issue_comments():
                         if comment.created_at > lastcheck:
-                            await self.send_embed(self.channel,
+                            await self.send_embed(channel,
                                                   f"{repoName} - New comment on pull #{pull.number}",
                                                   comment.html_url,
                                                   comment.body,
@@ -143,15 +143,15 @@ class Loop(commands.Cog):
                                                   )
 
                 for pull in ghRepo.get_pulls(state="closed"):
-                    if pull.merged and pull.merged_at.hour > lastcheck:
-                        await self.channel.send(
+                    if pull.merged and pull.merged_at > lastcheck:
+                        await channel.send(
                             f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
-                    elif pull.closed_at.hour > lastcheck:
-                        await self.channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+                    elif pull.closed_at > lastcheck:
+                        await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
 
             # this way pulls dont get re-detected every time the bot restarts
             self.conf["Config"]["Last_Checked"] = lastcheck
-            lastcheck = datetime.now().hour
+            lastcheck = datetime.now()
             await asyncio.sleep(900)
 
     @commands.command(aliases=("start", "run"))
