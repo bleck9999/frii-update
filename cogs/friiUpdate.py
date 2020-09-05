@@ -17,7 +17,8 @@ class Loop(commands.Cog):
         self.bot = bot
         self.channel = int(self.conf["Config"]["Channel ID"])
         self.role = int(self.conf["Config"]["Role ID"])
-        self.ghAPI = Github(self.conf["Tokens"]["Github"])
+        self.ghAPI = Github(self.conf["Tokens"]["Github"],
+                            per_page=20)  # let's not decimate the ratelimit after 4 seconds
 
         with open("repos.json", "r") as j:
             self.repos = json.load(j)
@@ -44,7 +45,7 @@ class Loop(commands.Cog):
         await self.bot.wait_until_ready()
         channel = await self.bot.fetch_channel(self.channel)
         if "Last_Checked" in self.conf["Config"].keys():
-            lastcheck = self.conf["Config"]["Last_Checked"]
+            lastcheck = datetime.strptime(self.conf["Config"]["Last_Checked"], "%H%M%S %d%m%Y")
         else:
             lastcheck = datetime.now()
         while True:
@@ -142,7 +143,11 @@ class Loop(commands.Cog):
                                                   i
                                                   )
 
-                for pull in ghRepo.get_pulls(state="closed"):
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
+                prs = ghRepo.get_pulls(state="closed")
+                limit = 20 if prs.totalCount >= 20 else prs.totalCount
+
+                for pull in prs[:limit]:
                     if pull.merged and pull.merged_at > lastcheck:
                         await channel.send(
                             f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
@@ -150,8 +155,11 @@ class Loop(commands.Cog):
                         await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
 
             # this way pulls dont get re-detected every time the bot restarts
-            self.conf["Config"]["Last_Checked"] = lastcheck
             lastcheck = datetime.now()
+            self.conf["Config"]["Last_Checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
+            with open("frii_update.ini", "w") as confFile:
+                self.conf.write(confFile)
+
             await asyncio.sleep(900)
 
     @commands.command(aliases=("start", "run"))
