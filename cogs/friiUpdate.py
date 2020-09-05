@@ -2,7 +2,7 @@ import asyncio
 import configparser
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 import discord
 import git
