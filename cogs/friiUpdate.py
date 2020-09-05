@@ -47,7 +47,7 @@ class Loop(commands.Cog):
         if "Last_Checked" in self.conf["Config"].keys():
             lastcheck = datetime.strptime(self.conf["Config"]["Last_Checked"], "%H%M%S %d%m%Y")
         else:
-            lastcheck = datetime.now()
+            lastcheck = datetime.utcnow()
         while True:
             ponged = False
             for i in range(len(self.repos)):
@@ -155,7 +155,7 @@ class Loop(commands.Cog):
                         await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
 
             # this way pulls dont get re-detected every time the bot restarts
-            lastcheck = datetime.now()
+            lastcheck = datetime.utcnow()
             self.conf["Config"]["Last_Checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
             with open("frii_update.ini", "w") as confFile:
                 self.conf.write(confFile)
