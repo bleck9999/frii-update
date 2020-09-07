@@ -100,7 +100,7 @@ class Loop(commands.Cog):
                             ponged = True
 
                         await self.send_embed(channel,
-                                              f"{repoName}: {commit.hexsha} on branch {branch.name}",
+                                              f"{repoName}: {commit.hexsha} on {branch.name}",
                                               f"{origin.url}/commit/{commit.hexsha}",
                                               commit.message,
                                               "Committed on ",
