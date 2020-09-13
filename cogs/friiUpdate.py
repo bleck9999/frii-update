@@ -118,7 +118,7 @@ class Loop(commands.Cog):
                             ponged = True
 
                         await self.send_embed(channel,
-                                              f"{repoName}: {pull.title} (#{pull.number})",
+                                              f"{repoName}: #{pull.number} - {pull.title} {'(draft)' if pull.draft else ''}",
                                               pull.html_url,
                                               pull.body,
                                               "Opened on: ",
