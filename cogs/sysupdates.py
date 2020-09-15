@@ -6,7 +6,7 @@ from discord.ext import commands
 
 
 class friiRSS(commands.Cog):
-    async def check_sysupdates(self, ponged):
+    async def check_sysupdates(self, ponged, roleid, bot):
 
         with open("info.json") as j:
             js = json.load(j)
@@ -20,7 +20,7 @@ class friiRSS(commands.Cog):
             version = entry.title[7:]
             if version not in entries:
                 if not ponged:
-                    await self.send("<@&700345049191415920> New firmware version detected!")
+                    await self.send(f"<@&{roleid}> New firmware version detected!")
                 await self.send(f"Version {version} released on: {entry.published}")
                 entries.append(version)
 
@@ -28,3 +28,6 @@ class friiRSS(commands.Cog):
             js = json.load(j)
             js["sysupdates"] = entries
             json.dump(js, j)
+
+def setup(bot):
+    bot.add_cog(friiRSS(bot))

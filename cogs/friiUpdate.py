@@ -55,7 +55,7 @@ class Loop(commands.Cog):
             ponged = False
 
             if check_sys_updates:
-                ponged = friiRSS.check_sysupdates(ponged=ponged)
+                ponged = friiRSS.check_sysupdates(ponged=ponged, roleid=self.role, bot=self.bot)
 
             for i in range(len(self.repos)):
                 repo = git.Repo(self.repos[i][0])
