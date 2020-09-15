@@ -135,4 +135,4 @@ dmypy.json
 # Project specific
 .gitarchive
 frii_update.ini
-repos.json
+info.json

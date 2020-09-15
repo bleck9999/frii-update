@@ -9,6 +9,7 @@ config.read("frii_update.ini")
 class FriiUpdate(commands.Bot):
     def __init__(self, command_prefix, **options):
         super().__init__(command_prefix, **options)
+        self.load_extension("cogs.sysupdates")
         self.load_extension("cogs.friiUpdate")
         self.role = int(config["Config"]["Role ID"])
 

@@ -9,6 +9,8 @@ import git
 from discord.ext import commands
 from github import Github
 
+from cogs.sysupdates import friiRSS
+
 
 class Loop(commands.Cog):
     def __init__(self, bot):
@@ -20,8 +22,9 @@ class Loop(commands.Cog):
         self.ghAPI = Github(self.conf["Tokens"]["Github"],
                             per_page=20)  # let's not decimate the ratelimit after 4 seconds
 
-        with open("repos.json", "r") as j:
-            self.repos = json.load(j)
+        with open("info.json", "r") as j:
+            c = json.load(j)
+            self.repos = c["repos"]
             for i in self.repos:
                 i[1] = discord.Color(i[1])
 
@@ -41,7 +44,7 @@ class Loop(commands.Cog):
         embed.description = description + "\n" + datemsg + str(date)
         await channel.send(embed=embed)
 
-    async def updateLoop(self):
+    async def updateLoop(self, check_sys_updates):
         await self.bot.wait_until_ready()
         channel = await self.bot.fetch_channel(self.channel)
         if "Last_Checked" in self.conf["Config"].keys():
@@ -50,6 +53,10 @@ class Loop(commands.Cog):
             lastcheck = datetime.utcnow()
         while True:
             ponged = False
+
+            if check_sys_updates:
+                ponged = friiRSS.check_sysupdates(ponged=ponged)
+
             for i in range(len(self.repos)):
                 repo = git.Repo(self.repos[i][0])
                 # NEW_COMMITS = {}
@@ -164,7 +171,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=("start", "run"))
     async def startLoop(self, ctx):
-        await self.updateLoop()
+        await self.updateLoop(True)
 
 
 def setup(bot):
