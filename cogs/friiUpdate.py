@@ -9,7 +9,7 @@ import git
 from discord.ext import commands
 from github import Github
 
-from cogs.sysupdates import friiRSS
+from cogs import sysupdates
 
 
 class Loop(commands.Cog):
@@ -55,7 +55,7 @@ class Loop(commands.Cog):
             ponged = False
 
             if check_sys_updates:
-                ponged = friiRSS.check_sysupdates(ponged=ponged, roleid=self.role, bot=self.bot)
+                ponged = await sysupdates.friiRSS.check_sysupdates(sysupdates, ponged, self.role, channel)
 
             for i in range(len(self.repos)):
                 repo = git.Repo(self.repos[i][0])
