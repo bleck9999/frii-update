@@ -171,7 +171,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=("start", "run"))
     async def startLoop(self, ctx):
-        await self.updateLoop(True)
+        await self.updateLoop(bool(self.conf["Config"]["do_sysupdates"]))
 
 
 def setup(bot):
