@@ -28,6 +28,8 @@ class FriiUpdate(commands.Bot):
             await channel.send(page)
 
 
-bot = FriiUpdate(command_prefix=".", intents=Intents.none())
+intents = Intents.none()
+intents.messages = True
+bot = FriiUpdate(command_prefix=".", intents=intents)
 print("Run bot")
 bot.run(config["Tokens"]["Discord"])
