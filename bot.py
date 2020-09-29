@@ -1,4 +1,5 @@
 import configparser
+from discord import Intents
 from discord.ext import commands
 from traceback import format_exception
 
@@ -16,17 +17,17 @@ class FriiUpdate(commands.Bot):
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache 2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
-        self.channel = await self.fetch_channel(int(config["Config"]["Channel ID"]))
-        await self.channel.send(f"<@&{self.role}> an unhandled exception has occurred")
+        channel = await self.fetch_channel(int(config["Config"]["Channel ID"]))
+        await channel.send(f"<@&{self.role}> an unhandled exception has occurred")
         exc = getattr(exception, 'original', exception)
         msg = "".join(format_exception(type(exc), exc, exc.__traceback__))
         error_paginator = commands.Paginator()
         for chunk in [msg[i:i + 1800] for i in range(0, len(msg), 1800)]:
             error_paginator.add_line(chunk)
         for page in error_paginator.pages:
-            await self.channel.send(page)
+            await channel.send(page)
 
 
-bot = FriiUpdate(command_prefix=".")
+bot = FriiUpdate(command_prefix=".", intents=Intents.none())
 print("Run bot")
 bot.run(config["Tokens"]["Discord"])
