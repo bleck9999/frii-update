@@ -98,7 +98,7 @@ class Loop(commands.Cog):
                     repo.git.pull()
                     Clist = list(repo.iter_commits(branch.name))
                     ncc = len(Clist) - occ
-                    for index in range(ncc):
+                    for index in reversed(range(ncc)):
                         commit = Clist[index]
                         author = ghRepo.get_commit(commit.hexsha).author
                         if not ponged:
