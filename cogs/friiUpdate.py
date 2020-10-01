@@ -118,7 +118,11 @@ class Loop(commands.Cog):
                                               i
                                               )
 
-                for pull in ghRepo.get_pulls():
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
+                prs = ghRepo.get_pulls(state="closed")
+                limit = 20 if prs.totalCount >= 20 else prs.totalCount
+
+                for pull in prs[:limit]:
                     if pull.created_at > lastcheck:
                         if not ponged:
                             await channel.send(f"<@&{self.role}> New pr(s) detected!")
@@ -150,11 +154,6 @@ class Loop(commands.Cog):
                                                   i
                                                   )
 
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-                prs = ghRepo.get_pulls(state="closed")
-                limit = 20 if prs.totalCount >= 20 else prs.totalCount
-
-                for pull in prs[:limit]:
                     if pull.merged and pull.merged_at > lastcheck:
                         await channel.send(
                             f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
