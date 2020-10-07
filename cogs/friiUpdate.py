@@ -90,6 +90,7 @@ class Loop(commands.Cog):
                             else:
                                 repo.git.checkout(repo.branches[1].name)
                         repo.git.branch("-D", branch.name)
+                        continue
 
                     print(
                         f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
