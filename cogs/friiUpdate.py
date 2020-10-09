@@ -144,7 +144,7 @@ class Loop(commands.Cog):
                     for comment in pull.get_issue_comments():
                         if comment.created_at > lastcheck:
                             await self.send_embed(channel,
-                                                  f"{repoName} - New comment on pull #{pull.number}",
+                                                  f"{repoName} - New comment on pull {pull.title} (#{pull.number})",
                                                   comment.html_url,
                                                   comment.body,
                                                   "Commented on: ",
@@ -155,11 +155,12 @@ class Loop(commands.Cog):
                                                   i
                                                   )
 
-                    if pull.merged and pull.merged_at > lastcheck:
-                        await channel.send(
-                            f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
-                    elif pull.closed_at > lastcheck:
-                        await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+                    if pull.state != "open":
+                        if pull.merged and pull.merged_at > lastcheck:
+                            await channel.send(
+                                f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
+                        elif pull.closed_at > lastcheck:
+                            await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
 
             # this way pulls dont get re-detected every time the bot restarts
             lastcheck = datetime.utcnow()
