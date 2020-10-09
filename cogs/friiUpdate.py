@@ -120,7 +120,7 @@ class Loop(commands.Cog):
                                               )
 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-                prs = ghRepo.get_pulls(state="closed")
+                prs = ghRepo.get_pulls(state="all")
                 limit = 20 if prs.totalCount >= 20 else prs.totalCount
 
                 for pull in prs[:limit]:
