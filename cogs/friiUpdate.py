@@ -144,7 +144,7 @@ class Loop(commands.Cog):
                     for comment in pull.get_issue_comments():
                         if comment.created_at > lastcheck:
                             await self.send_embed(channel,
-                                                  f"{repoName} - New comment on pull {pull.title} (#{pull.number})",
+                                                  f"{repoName} - New comment on {pull.title} (#{pull.number})",
                                                   comment.html_url,
                                                   comment.body,
                                                   "Commented on: ",
