@@ -6,8 +6,8 @@ from datetime import datetime
 
 import discord
 import git
+from gql import gql, AIOHTTPTransport, Client
 from discord.ext import commands
-from github import Github
 
 from cogs import sysupdates
 
@@ -19,8 +19,6 @@ class Loop(commands.Cog):
         self.bot = bot
         self.channel = int(self.conf["Config"]["Channel ID"])
         self.role = int(self.conf["Config"]["Role ID"])
-        self.ghAPI = Github(self.conf["Tokens"]["Github"],
-                            per_page=20)  # let's not decimate the ratelimit after 4 seconds
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -51,124 +49,133 @@ class Loop(commands.Cog):
             lastcheck = datetime.strptime(self.conf["Config"]["Last_Checked"], "%H%M%S %d%m%Y")
         else:
             lastcheck = datetime.utcnow()
-        while True:
-            ponged = False
 
-            if check_sys_updates:
-                ponged = await sysupdates.friiRSS.check_sysupdates(sysupdates, ponged, self.role, channel)
+        headers = {"Authorization": f"Bearer {self.conf['Tokens']['github']}"}
+        transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
+        async with Client(transport=transport, fetch_schema_from_transport=True) as session:
+            while True:
+                ponged = False
 
-            for i in range(len(self.repos)):
-                repo = git.Repo(self.repos[i][0])
-                # NEW_COMMITS = {}
-                origin = repo.remotes["origin"]
-                ghRepo = self.ghAPI.get_repo(f"{origin.url[19:] if origin.url[-1] != '/' else origin.url[19:-1]}")
-                branches = [branch.name for branch in repo.branches]
-                repoName = origin.url.split(sep='/')[4]
+                if check_sys_updates:
+                    ponged = await sysupdates.friiRSS.check_sysupdates(sysupdates, ponged, self.role, channel)
 
-                repo.git.fetch("-p")
+                for i in range(len(self.repos)):
+                    repo = git.Repo(self.repos[i][0])
+                    # NEW_COMMITS = {}
+                    origin = repo.remotes["origin"]
 
-                for branch in origin.refs:
-                    if branch.remote_head == "HEAD" or branch.remote_head in branches:
-                        pass
-                    else:
-                        repo.git.branch("--track", branch.remote_head, branch.name)
-                        if not ponged:
-                            await channel.send(f"<@&{self.role}> New branch(es) detected!")
-                            ponged = True
-                        await channel.send(f"New branch: {branch.remote_head} on {repoName}")
+                    branches = [branch.name for branch in repo.branches]
+                    repoName = origin.url.split(sep='/')[4]
 
-                for branch in repo.branches:
-                    if branch.tracking_branch() not in origin.refs:
-                        if not ponged:
-                            await channel.send(f"<@&{self.role}> Branch(es) deleted!")
-                            ponged = True
-                        await channel.send(f"Deleted branch: {branch.name} on {repoName}")
+                    req = """query {
+                        repository(owner:"%(owner)", name:"%(repo_name)") {
+                          issues
+                    }""" % {"owner": origin.url.split(sep='/')[3], "repo_name": repoName}
 
-                        if repo.active_branch == branch:
-                            if branch != repo.branches[0]:
-                                repo.git.checkout(repo.branches[0].name)
-                            else:
-                                repo.git.checkout(repo.branches[1].name)
-                        repo.git.branch("-D", branch.name)
-                        continue
+                    repo.git.fetch("-p")
 
-                    print(
-                        f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
-                    occ = len(list(repo.iter_commits(branch.name)))  # old commit count
-                    repo.git.checkout(branch.name)
-                    repo.git.pull()
-                    Clist = list(repo.iter_commits(branch.name))
-                    ncc = len(Clist) - occ
-                    for index in reversed(range(ncc)):
-                        commit = Clist[index]
-                        author = ghRepo.get_commit(commit.hexsha).author
-                        if not ponged:
-                            await channel.send(
-                                f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
-                            ponged = True
+                    for branch in origin.refs:
+                        if branch.remote_head == "HEAD" or branch.remote_head in branches:
+                            pass
+                        else:
+                            repo.git.branch("--track", branch.remote_head, branch.name)
+                            if not ponged:
+                                await channel.send(f"<@&{self.role}> New branch(es) detected!")
+                                ponged = True
+                            await channel.send(f"New branch: {branch.remote_head} on {repoName}")
 
-                        await self.send_embed(channel,
-                                              f"{repoName}: {commit.hexsha} on {branch.name}",
-                                              f"{origin.url}/commit/{commit.hexsha}",
-                                              commit.message,
-                                              "Committed on ",
-                                              time.asctime(time.gmtime(commit.committed_date)),
-                                              author.login,
-                                              author.html_url,
-                                              author.avatar_url,
-                                              i
-                                              )
+                    for branch in repo.branches:
+                        if branch.tracking_branch() not in origin.refs:
+                            if not ponged:
+                                await channel.send(f"<@&{self.role}> Branch(es) deleted!")
+                                ponged = True
+                            await channel.send(f"Deleted branch: {branch.name} on {repoName}")
 
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-                prs = ghRepo.get_pulls(state="all")
-                limit = 20 if prs.totalCount >= 20 else prs.totalCount
+                            if repo.active_branch == branch:
+                                if branch != repo.branches[0]:
+                                    repo.git.checkout(repo.branches[0].name)
+                                else:
+                                    repo.git.checkout(repo.branches[1].name)
+                            repo.git.branch("-D", branch.name)
+                            continue
 
-                for pull in prs[:limit]:
-                    if pull.created_at > lastcheck:
-                        if not ponged:
-                            await channel.send(f"<@&{self.role}> New pr(s) detected!")
-                            ponged = True
+                        print(
+                            f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
+                        occ = len(list(repo.iter_commits(branch.name)))  # old commit count
+                        repo.git.checkout(branch.name)
+                        repo.git.pull()
+                        Clist = list(repo.iter_commits(branch.name))
+                        ncc = len(Clist) - occ
+                        for index in reversed(range(ncc)):
+                            commit = Clist[index]
+                            author = ghRepo.get_commit(commit.hexsha).author
+                            if not ponged:
+                                await channel.send(
+                                    f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
+                                ponged = True
 
-                        await self.send_embed(channel,
-                                              f"{repoName}: #{pull.number} - {pull.title} {'(draft)' if pull.draft else ''}",
-                                              pull.html_url,
-                                              pull.body,
-                                              "Opened on: ",
-                                              pull.created_at,
-                                              pull.user.login,
-                                              pull.user.html_url,
-                                              pull.user.avatar_url,
-                                              i
-                                              )
-
-                    for comment in pull.get_issue_comments():
-                        if comment.created_at > lastcheck:
                             await self.send_embed(channel,
-                                                  f"{repoName} - New comment on {pull.title} (#{pull.number})",
-                                                  comment.html_url,
-                                                  comment.body,
-                                                  "Commented on: ",
-                                                  comment.created_at,
-                                                  comment.user.login,
-                                                  comment.user.html_url,
-                                                  comment.user.avatar_url,
+                                                  f"{repoName}: {commit.hexsha} on {branch.name}",
+                                                  f"{origin.url}/commit/{commit.hexsha}",
+                                                  commit.message,
+                                                  "Committed on ",
+                                                  time.asctime(time.gmtime(commit.committed_date)),
+                                                  author.login,
+                                                  author.html_url,
+                                                  author.avatar_url,
                                                   i
                                                   )
 
-                    if pull.state != "open":
-                        if pull.merged and pull.merged_at > lastcheck:
-                            await channel.send(
-                                f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
-                        elif pull.closed_at > lastcheck:
-                            await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
+                    prs = ghRepo.get_pulls(state="all")
+                    limit = 20 if prs.totalCount >= 20 else prs.totalCount
 
-            # this way pulls dont get re-detected every time the bot restarts
-            lastcheck = datetime.utcnow()
-            self.conf["Config"]["Last_Checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
-            with open("frii_update.ini", "w") as confFile:
-                self.conf.write(confFile)
+                    for pull in prs[:limit]:
+                        if pull.created_at > lastcheck:
+                            if not ponged:
+                                await channel.send(f"<@&{self.role}> New pr(s) detected!")
+                                ponged = True
 
-            await asyncio.sleep(900)
+                            await self.send_embed(channel,
+                                                  f"{repoName}: #{pull.number} - {pull.title} {'(draft)' if pull.draft else ''}",
+                                                  pull.html_url,
+                                                  pull.body,
+                                                  "Opened on: ",
+                                                  pull.created_at,
+                                                  pull.user.login,
+                                                  pull.user.html_url,
+                                                  pull.user.avatar_url,
+                                                  i
+                                                  )
+
+                        for comment in pull.get_issue_comments():
+                            if comment.created_at > lastcheck:
+                                await self.send_embed(channel,
+                                                      f"{repoName} - New comment on {pull.title} (#{pull.number})",
+                                                      comment.html_url,
+                                                      comment.body,
+                                                      "Commented on: ",
+                                                      comment.created_at,
+                                                      comment.user.login,
+                                                      comment.user.html_url,
+                                                      comment.user.avatar_url,
+                                                      i
+                                                      )
+
+                        if pull.state != "open":
+                            if pull.merged and pull.merged_at > lastcheck:
+                                await channel.send(
+                                    f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
+                            elif pull.closed_at > lastcheck:
+                                await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+
+                # this way pulls dont get re-detected every time the bot restarts
+                lastcheck = datetime.utcnow()
+                self.conf["Config"]["Last_Checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
+                with open("frii_update.ini", "w") as confFile:
+                    self.conf.write(confFile)
+
+                await asyncio.sleep(900)
 
     @commands.command(aliases=("start", "run"))
     async def startLoop(self, ctx):
