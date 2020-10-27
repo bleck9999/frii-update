@@ -67,51 +67,7 @@ class Loop(commands.Cog):
 
                     branches = [branch.name for branch in repo.branches]
                     repoName = origin.url.split(sep='/')[4]
-
-                    req = """
-                                        query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $lastcheck:String!
-                                               ) {
-                                            repository(owner:$owner, name:$repo_name) {
-                                              pullRequests(last:$Plimit) {
-                                                edges {
-                                                  node {
-                                                    author {
-                                                      avatarUrl
-                                                      login
-                                                      url
-                                                    }
-                                                    body
-                                                    closed
-                                                    closedAt
-                                                    comments (last: $Climit) { nodes {
-                                                      author {
-                                                        avatarUrl
-                                                        login
-                                                        url
-                                                      }
-                                                      body
-                                                      url
-                                                      createdAt
-                                                      }}
-                                                    createdAt
-                                                    isDraft
-                                                    merged
-                                                    mergedAt
-                                                    mergedBy {login}
-                                                    number
-                                                    title
-                                                    url
-                                                }
-                                              }
-                                            }
-                                        }"""
-                    params = {"owner": origin.url.split(sep='/')[3],
-                              "repo_name": repoName,
-                              "Plimit": self.PRlimit,
-                              "Climit": self.CommentLimit,
-                              "lastcheck": lastcheck.strptime
-                              }
-                    result = await session.execute(gql(req), variable_values=params)
+                    repoAuthor = origin.url.split(sep='/')[3]
 
                     repo.git.fetch("-p")
 
@@ -147,9 +103,41 @@ class Loop(commands.Cog):
                         repo.git.pull()
                         Clist = list(repo.iter_commits(branch.name))
                         ncc = len(Clist) - occ
+
+                        req = """query($owner:String!, $name:String!, $branch:String!, $ncc:Int!) {
+                          repository(owner: $owner, name: $name) {
+                            ref(qualifiedName: $branch) {
+                              target {
+                                ... on Commit {
+                                  history(first: $ncc) {
+                                    pageInfo {
+                                      hasNextPage
+                                      endCursor
+                                    }
+                                    edges {
+                                      node {
+                                        author {
+                                          avatarUrl
+                                          user {login url}
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }"""
+                        params = {"owner": repoAuthor,
+                                  "name": repoName,
+                                  "branch": branch.name,
+                                  "ncc": ncc}
+                        result = await session.execute(gql(req), variable_values=params)
+
                         for index in reversed(range(ncc)):
                             commit = Clist[index]
-                            author = ghRepo.get_commit(commit.hexsha).author
+                            author = result["repository"]["ref"]["target"]["history"]["edges"][index]["node"]["author"]
+
                             if not ponged:
                                 await channel.send(
                                     f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
@@ -161,14 +149,58 @@ class Loop(commands.Cog):
                                                   commit.message,
                                                   "Committed on ",
                                                   time.asctime(time.gmtime(commit.committed_date)),
-                                                  author.login,
-                                                  author.html_url,
-                                                  author.avatar_url,
+                                                  author["user"]["login"],
+                                                  author["user"]["url"],
+                                                  author["url"],
                                                   i
                                                   )
 
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
 
+                    req = """
+                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $lastcheck:String!
+                           ) {
+                        repository(owner:$owner, name:$repo_name) {
+                          pullRequests(last:$Plimit) {
+                            edges {
+                              node {
+                                author {
+                                  avatarUrl
+                                  login
+                                  url
+                                }
+                                body
+                                closed
+                                closedAt
+                                comments (last: $Climit) { nodes {
+                                  author {
+                                    avatarUrl
+                                    login
+                                    url
+                                  }
+                                  body
+                                  url
+                                  createdAt
+                                  }}
+                                createdAt
+                                isDraft
+                                merged
+                                mergedAt
+                                mergedBy {login}
+                                number
+                                title
+                                url
+                            }
+                          }
+                        }
+                    }"""
+                    params = {"owner": repoAuthor,
+                              "repo_name": repoName,
+                              "Plimit": self.PRlimit,
+                              "Climit": self.CommentLimit,
+                              "lastcheck": lastcheck.strptime
+                              }
+                    result = await session.execute(gql(req), variable_values=params)
                     pulls = result["repository"]["pullRequests"]["edges"]
 
                     for num in range(pulls):
