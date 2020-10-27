@@ -20,6 +20,7 @@ class Loop(commands.Cog):
         self.channel = int(self.conf["Config"]["Channel ID"])
         self.role = int(self.conf["Config"]["Role ID"])
         self.PRlimit = int(self.conf["Config"]["Pull limit"])
+        self.CommentLimit = int(self.conf["Config"]["Comment limit"])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -104,39 +105,42 @@ class Loop(commands.Cog):
                         Clist = list(repo.iter_commits(branch.name))
                         ncc = len(Clist) - occ
 
-                        req = """query($owner:String!, $name:String!, $branch:String!, $ncc:Int!) {
-                          repository(owner: $owner, name: $name) {
-                            ref(qualifiedName: $branch) {
-                              target {
-                                ... on Commit {
-                                  history(first: $ncc) {
-                                    pageInfo {
-                                      hasNextPage
-                                      endCursor
-                                    }
-                                    edges {
-                                      node {
-                                        author {
-                                          avatarUrl
-                                          user {login url}
+                        if ncc > 0:
+                            req = """query($owner:String!, $name:String!, $branch:String!, $ncc:Int!) {
+                              repository(owner: $owner, name: $name) {
+                                ref(qualifiedName: $branch) {
+                                  target {
+                                    ... on Commit {
+                                      history(first: $ncc) {
+                                        pageInfo {
+                                          hasNextPage
+                                          endCursor
+                                        }
+                                        edges {
+                                          node {
+                                            author {
+                                              avatarUrl
+                                              user {login url}
+                                            }
+                                          }
                                         }
                                       }
                                     }
                                   }
                                 }
                               }
-                            }
-                          }
-                        }"""
-                        params = {"owner": repoAuthor,
-                                  "name": repoName,
-                                  "branch": branch.name,
-                                  "ncc": ncc}
-                        result = await session.execute(gql(req), variable_values=params)
+                            }"""
+                            params = {"owner": repoAuthor,
+                                      "name": repoName,
+                                      "branch": branch.name,
+                                      "ncc": ncc}
+                            result = await session.execute(gql(req), variable_values=params)
 
                         for index in reversed(range(ncc)):
                             commit = Clist[index]
                             author = result["repository"]["ref"]["target"]["history"]["edges"][index]["node"]["author"]
+                            # oh by the way author["user"] can be null if the git email doesn't
+                            # match any github account
 
                             if not ponged:
                                 await channel.send(
@@ -151,15 +155,14 @@ class Loop(commands.Cog):
                                                   time.asctime(time.gmtime(commit.committed_date)),
                                                   author["user"]["login"],
                                                   author["user"]["url"],
-                                                  author["url"],
+                                                  author["avatarUrl"],
                                                   i
                                                   )
 
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
 
                     req = """
-                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $lastcheck:String!
-                           ) {
+                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!) {
                         repository(owner:$owner, name:$repo_name) {
                           pullRequests(last:$Plimit) {
                             edges {
@@ -193,17 +196,17 @@ class Loop(commands.Cog):
                             }
                           }
                         }
+                      }
                     }"""
                     params = {"owner": repoAuthor,
                               "repo_name": repoName,
                               "Plimit": self.PRlimit,
-                              "Climit": self.CommentLimit,
-                              "lastcheck": lastcheck.strptime
+                              "Climit": self.CommentLimit
                               }
                     result = await session.execute(gql(req), variable_values=params)
                     pulls = result["repository"]["pullRequests"]["edges"]
 
-                    for num in range(pulls):
+                    for num in range(len(pulls)):
                         pull = pulls[num]["node"]
                         createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                         if createdAt > lastcheck:
@@ -213,7 +216,7 @@ class Loop(commands.Cog):
 
                             await self.send_embed(channel,
                                                   f"{repoName}: #{pull['number']} - {pull['title']} "
-                                                  f"{'(draft)' if pull['draft'] else ''}",
+                                                  f"{'(draft)' if pull['isDraft'] else ''}",
                                                   pull['url'],
                                                   pull['body'],
                                                   "Opened on: ",
