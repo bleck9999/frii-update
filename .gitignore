@@ -136,3 +136,5 @@ dmypy.json
 .gitarchive
 frii_update.ini
 info.json
+schema.graphql
+.graphqlconfig

@@ -19,6 +19,7 @@ class Loop(commands.Cog):
         self.bot = bot
         self.channel = int(self.conf["Config"]["Channel ID"])
         self.role = int(self.conf["Config"]["Role ID"])
+        self.PRlimit = int(self.conf["Config"]["Pull limit"])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -45,8 +46,8 @@ class Loop(commands.Cog):
     async def updateLoop(self, check_sys_updates):
         await self.bot.wait_until_ready()
         channel = await self.bot.fetch_channel(self.channel)
-        if "Last_Checked" in self.conf["Config"].keys():
-            lastcheck = datetime.strptime(self.conf["Config"]["Last_Checked"], "%H%M%S %d%m%Y")
+        if "Last checked" in self.conf["Config"].keys():
+            lastcheck = datetime.strptime(self.conf["Config"]["Last checked"], "%H%M%S %d%m%Y")
         else:
             lastcheck = datetime.utcnow()
 
@@ -66,11 +67,6 @@ class Loop(commands.Cog):
 
                     branches = [branch.name for branch in repo.branches]
                     repoName = origin.url.split(sep='/')[4]
-
-                    req = """query {
-                        repository(owner:"%(owner)", name:"%(repo_name)") {
-                          issues
-                    }""" % {"owner": origin.url.split(sep='/')[3], "repo_name": repoName}
 
                     repo.git.fetch("-p")
 
@@ -127,8 +123,40 @@ class Loop(commands.Cog):
                                                   )
 
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-                    prs = ghRepo.get_pulls(state="all")
-                    limit = 20 if prs.totalCount >= 20 else prs.totalCount
+
+                    req = """
+                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $lastcheck:String!
+                           ) {
+                        repository(owner:$owner, name:$repo_name) {
+                          pullRequests(last:$Plimit) {
+                            edges {
+                              node {
+                                author
+                                body
+                                closed
+                                closedAt
+                                createdAt
+                                isDraft
+                                merged
+                                mergedAt
+                                mergedBy
+                                number
+                                title
+                                comments (after: $lastcheck) { nodes {
+                                  body
+                                  url
+                                  createdAt
+                                  }
+                                }
+                              }
+                            }
+                          }
+                    }"""
+                    params = {"owner": origin.url.split(sep='/')[3],
+                              "repo_name": repoName,
+                              "Plimit": self.PRlimit
+                              }
+                    result = await session.execute(gql(req), variable_values=params)
 
                     for pull in prs[:limit]:
                         if pull.created_at > lastcheck:
@@ -171,7 +199,7 @@ class Loop(commands.Cog):
 
                 # this way pulls dont get re-detected every time the bot restarts
                 lastcheck = datetime.utcnow()
-                self.conf["Config"]["Last_Checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
+                self.conf["Config"]["Last checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
                 with open("frii_update.ini", "w") as confFile:
                     self.conf.write(confFile)
 
@@ -179,7 +207,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=("start", "run"))
     async def startLoop(self, ctx):
-        await self.updateLoop(bool(self.conf["Config"]["do_sysupdates"]))
+        await self.updateLoop(bool(self.conf["Config"]["Check sysupdates"]))
 
 
 def setup(bot):
