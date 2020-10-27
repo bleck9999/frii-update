@@ -6,8 +6,8 @@ from datetime import datetime
 
 import discord
 import git
-from gql import gql, AIOHTTPTransport, Client
 from discord.ext import commands
+from gql import gql, AIOHTTPTransport, Client
 
 from cogs import sysupdates
 
@@ -252,7 +252,7 @@ class Loop(commands.Cog):
                             elif closedAt > lastcheck:
                                 await channel.send(f"{repoName} - PR #{pull['number']} closed at {closedAt}")
 
-                # this way pulls dont get re-detected every time the bot restarts
+                # this way pulls don't get re-detected every time the bot restarts
                 lastcheck = datetime.utcnow()
                 self.conf["Config"]["Last checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
                 with open("frii_update.ini", "w") as confFile:
