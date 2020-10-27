@@ -68,6 +68,51 @@ class Loop(commands.Cog):
                     branches = [branch.name for branch in repo.branches]
                     repoName = origin.url.split(sep='/')[4]
 
+                    req = """
+                                        query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $lastcheck:String!
+                                               ) {
+                                            repository(owner:$owner, name:$repo_name) {
+                                              pullRequests(last:$Plimit) {
+                                                edges {
+                                                  node {
+                                                    author {
+                                                      avatarUrl
+                                                      login
+                                                      url
+                                                    }
+                                                    body
+                                                    closed
+                                                    closedAt
+                                                    comments (last: $Climit) { nodes {
+                                                      author {
+                                                        avatarUrl
+                                                        login
+                                                        url
+                                                      }
+                                                      body
+                                                      url
+                                                      createdAt
+                                                      }}
+                                                    createdAt
+                                                    isDraft
+                                                    merged
+                                                    mergedAt
+                                                    mergedBy {login}
+                                                    number
+                                                    title
+                                                    url
+                                                }
+                                              }
+                                            }
+                                        }"""
+                    params = {"owner": origin.url.split(sep='/')[3],
+                              "repo_name": repoName,
+                              "Plimit": self.PRlimit,
+                              "Climit": self.CommentLimit,
+                              "lastcheck": lastcheck.strptime
+                              }
+                    result = await session.execute(gql(req), variable_values=params)
+
                     repo.git.fetch("-p")
 
                     for branch in origin.refs:
@@ -124,78 +169,53 @@ class Loop(commands.Cog):
 
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
 
-                    req = """
-                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $lastcheck:String!
-                           ) {
-                        repository(owner:$owner, name:$repo_name) {
-                          pullRequests(last:$Plimit) {
-                            edges {
-                              node {
-                                author
-                                body
-                                closed
-                                closedAt
-                                createdAt
-                                isDraft
-                                merged
-                                mergedAt
-                                mergedBy
-                                number
-                                title
-                                comments (after: $lastcheck) { nodes {
-                                  body
-                                  url
-                                  createdAt
-                                  }
-                                }
-                              }
-                            }
-                          }
-                    }"""
-                    params = {"owner": origin.url.split(sep='/')[3],
-                              "repo_name": repoName,
-                              "Plimit": self.PRlimit
-                              }
-                    result = await session.execute(gql(req), variable_values=params)
+                    pulls = result["repository"]["pullRequests"]["edges"]
 
-                    for pull in prs[:limit]:
-                        if pull.created_at > lastcheck:
+                    for num in range(pulls):
+                        pull = pulls[num]["node"]
+                        createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        if createdAt > lastcheck:
                             if not ponged:
                                 await channel.send(f"<@&{self.role}> New pr(s) detected!")
                                 ponged = True
 
                             await self.send_embed(channel,
-                                                  f"{repoName}: #{pull.number} - {pull.title} {'(draft)' if pull.draft else ''}",
-                                                  pull.html_url,
-                                                  pull.body,
+                                                  f"{repoName}: #{pull['number']} - {pull['title']} "
+                                                  f"{'(draft)' if pull['draft'] else ''}",
+                                                  pull['url'],
+                                                  pull['body'],
                                                   "Opened on: ",
-                                                  pull.created_at,
-                                                  pull.user.login,
-                                                  pull.user.html_url,
-                                                  pull.user.avatar_url,
+                                                  createdAt,
+                                                  pull["author"]["login"],
+                                                  pull["author"]["url"],
+                                                  pull["author"]["avatarUrl"],
                                                   i
                                                   )
 
-                        for comment in pull.get_issue_comments():
-                            if comment.created_at > lastcheck:
+                        for comment in pull["comments"]["nodes"]:
+                            CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            if CcreatedAt > lastcheck:
                                 await self.send_embed(channel,
                                                       f"{repoName} - New comment on {pull.title} (#{pull.number})",
-                                                      comment.html_url,
-                                                      comment.body,
+                                                      comment["url"],
+                                                      comment["body"],
                                                       "Commented on: ",
-                                                      comment.created_at,
-                                                      comment.user.login,
-                                                      comment.user.html_url,
-                                                      comment.user.avatar_url,
+                                                      CcreatedAt,
+                                                      comment["author"]["login"],
+                                                      comment["author"]["url"],
+                                                      comment["author"]["avatarUrl"],
                                                       i
                                                       )
 
-                        if pull.state != "open":
-                            if pull.merged and pull.merged_at > lastcheck:
-                                await channel.send(
-                                    f"{repoName} - PR #{pull.number} merged at {pull.merged_at} by {pull.merged_by.login}")
-                            elif pull.closed_at > lastcheck:
-                                await channel.send(f"{repoName} - PR #{pull.number} closed at {pull.closed_at}")
+                        if pull["closed"]:
+                            closedAt = datetime.strptime(pull["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            if pull["merged"]:
+                                mergedAt = datetime.strptime(pull["mergedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                if mergedAt > lastcheck:
+                                    await channel.send(
+                                        f"{repoName} - PR #{pull['number']} merged at {mergedAt} by {pull['mergedBy']['login']}")
+                            elif closedAt > lastcheck:
+                                await channel.send(f"{repoName} - PR #{pull['number']} closed at {closedAt}")
 
                 # this way pulls dont get re-detected every time the bot restarts
                 lastcheck = datetime.utcnow()
