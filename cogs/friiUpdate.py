@@ -231,7 +231,7 @@ class Loop(commands.Cog):
                             CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                             if CcreatedAt > lastcheck:
                                 await self.send_embed(channel,
-                                                      f"{repoName} - New comment on {pull.title} (#{pull.number})",
+                                                      f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
                                                       comment["url"],
                                                       comment["body"],
                                                       "Commented on: ",
