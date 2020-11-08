@@ -21,6 +21,7 @@ class Loop(commands.Cog):
         self.role = int(self.conf["Config"]["Role ID"])
         self.PRlimit = int(self.conf["Config"]["Pull limit"])
         self.CommentLimit = int(self.conf["Config"]["Comment limit"])
+        self.interval = int(self.conf["Config"]["Interval"])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -265,11 +266,23 @@ class Loop(commands.Cog):
                 with open("frii_update.ini", "w") as confFile:
                     self.conf.write(confFile)
 
-                await asyncio.sleep(900)
+                await asyncio.sleep(self.interval)
 
     @commands.command(aliases=("start", "run"))
     async def startLoop(self, ctx):
         await self.updateLoop(bool(self.conf["Config"]["Check sysupdates"]))
+
+    @commands.command()
+    async def interval(self, ctx, interval):
+        """Changes the amount of time the bot waits between checks.
+        Usage: `.interval <time (s)>`"""
+        try:
+            int(interval)
+        except ValueError:
+            await ctx.send("Interval must be an integer")
+            return
+        self.interval = int(interval)
+        await ctx.send(f"Interval set to {self.interval} seconds")
 
 
 def setup(bot):
