@@ -72,6 +72,7 @@ class Loop(commands.Cog):
 
                     repo.git.fetch("-p")
 
+                    ugly_hack = False
                     for branch in origin.refs:
                         if branch.remote_head == "HEAD" or branch.remote_head in branches:
                             pass
@@ -80,7 +81,10 @@ class Loop(commands.Cog):
                             if not ponged:
                                 await channel.send(f"<@&{self.role}> New branch(es) detected!")
                                 ponged = True
-                            await channel.send(f"New branch: {branch.remote_head} on {repoName}")
+                            await channel.send(f"New branch: {branch.name} on {repoName}")
+
+                            if origin.refs["HEAD"].commit in list(repo.iter_commits(branch.name)):
+                                ugly_hack = True
 
                     for branch in repo.branches:
                         if branch.tracking_branch() not in origin.refs:
@@ -99,7 +103,10 @@ class Loop(commands.Cog):
 
                         print(
                             f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
-                        occ = len(list(repo.iter_commits(branch.name)))  # old commit count
+                        if ugly_hack:
+                            occ = len(list(repo.iter_commits(origin.refs["HEAD"].name)))
+                        else:
+                            occ = len(list(repo.iter_commits(branch.name)))
                         repo.git.checkout(branch.name)
                         repo.git.pull()
                         Clist = list(repo.iter_commits(branch.name))
