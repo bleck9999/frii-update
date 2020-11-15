@@ -82,7 +82,7 @@ class Loop(commands.Cog):
                             if not ponged:
                                 await channel.send(f"<@&{self.role}> New branch(es) detected!")
                                 ponged = True
-                            await channel.send(f"New branch: {branch.branh.remote_head} on {repoName}")
+                            await channel.send(f"New branch: {branch.remote_head} on {repoName}")
 
                             if origin.refs["HEAD"].commit in list(repo.iter_commits(branch.name)):
                                 ugly_hack = True
