@@ -17,6 +17,8 @@ class friiRSS(commands.Cog):
 
         feed = feedparser.parse("https://yls8.mtheall.com/ninupdates/feed.php")
         for entry in feed.entries:
+            if "3DS" in entry.title:
+                continue
             version = entry.title[7:]
             if version not in entries:
                 if not ponged:
