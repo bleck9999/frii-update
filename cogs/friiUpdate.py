@@ -21,6 +21,7 @@ class Loop(commands.Cog):
         self.role = int(self.conf["Config"]["Role ID"])
         self.PRlimit = int(self.conf["Config"]["Pull limit"])
         self.CommentLimit = int(self.conf["Config"]["Comment limit"])
+        self.Rlimit = int(self.conf["Config"]["Review limit"])
         self.interval = int(self.conf["Config"]["Interval"])
 
         with open("info.json", "r") as j:
@@ -52,6 +53,14 @@ class Loop(commands.Cog):
             lastcheck = datetime.strptime(self.conf["Config"]["Last checked"], "%H%M%S %d%m%Y")
         else:
             lastcheck = datetime.utcnow()
+
+        reviewStates = {
+            "APPROVED": "Changes approved on",
+            "CHANGES_REQUESTED": "Changes requested on",
+            "COMMENTED": "Review submitted for",
+            "DISMISSED": "Review submitted for",
+            "PENDING": "Review submitted for"
+        }
 
         headers = {"Authorization": f"Bearer {self.conf['Tokens']['github']}"}
         transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
@@ -170,7 +179,7 @@ class Loop(commands.Cog):
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
 
                     req = """
-                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!) {
+                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $Rlimit:Int!) {
                         repository(owner:$owner, name:$repo_name) {
                           pullRequests(last:$Plimit) {
                             edges {
@@ -190,9 +199,31 @@ class Loop(commands.Cog):
                                     url
                                   }
                                   body
-                                  url
                                   createdAt
+                                  url
+                                }}
+                                reviews (last: $Rlimit) { nodes {
+                                  author {
+                                    avatarUrl
+                                    login
+                                    url
+                                  }
+                                  comments (last: $Climit) { nodes {
+                                    author {
+                                      avatarUrl
+                                      login
+                                      url
+                                    }
+                                    body
+                                    createdAt
+                                    diffHunk
+                                    url
                                   }}
+                                  body
+                                  createdAt
+                                  state
+                                  url
+                                }}
                                 createdAt
                                 isDraft
                                 merged
@@ -209,7 +240,8 @@ class Loop(commands.Cog):
                     params = {"owner": repoAuthor,
                               "repo_name": repoName,
                               "Plimit": self.PRlimit,
-                              "Climit": self.CommentLimit
+                              "Climit": self.CommentLimit,
+                              "Rlimit": self.Rlimit
                               }
                     result = await session.execute(gql(req), variable_values=params)
                     pulls = result["repository"]["pullRequests"]["edges"]
@@ -224,7 +256,7 @@ class Loop(commands.Cog):
 
                             await self.send_embed(channel,
                                                   f"{repoName}: #{pull['number']} - {pull['title']} "
-                                                  f"{'(draft)' if pull['isDraft'] else ''}",
+                                                  f"{'[DRAFT]' if pull['isDraft'] else ''}",
                                                   pull['url'],
                                                   pull['body'],
                                                   "Opened on: ",
@@ -249,6 +281,32 @@ class Loop(commands.Cog):
                                                       comment["author"]["avatarUrl"],
                                                       i
                                                       )
+
+                        for review in pull["reviews"]["nodes"]:
+                            RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            if RcreatedAt > lastcheck and review['body']:
+                                # github is fantastic and creates a new review for *any* review comment, its not worth sending this every time that happens
+                                await self.send_embed(channel,
+                                                      f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
+                                                      review['url'],
+                                                      review['body'],
+                                                      "Submitted on: ",
+                                                      RcreatedAt,
+                                                      review['author']['login'],
+                                                      review['author']['url'],
+                                                      review['author']['avatarUrl'],
+                                                      i
+                                                      )
+
+                                for comment in review['comments']["nodes"]:
+                                    CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                    if CcreatedAt > lastcheck:
+                                        embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
+                                        embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
+                                        embed.insert_field_at(0, name="Comment", value=comment['body'])
+                                        embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+
+                                        await channel.send(embed=embed)
 
                         if pull["closed"]:
                             closedAt = datetime.strptime(pull["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
