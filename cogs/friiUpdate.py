@@ -77,12 +77,12 @@ class Loop(commands.Cog):
                     origin = repo.remotes["origin"]
 
                     branches = [branch.name for branch in repo.branches]
+                    newBranches = []
                     repoName = origin.url.split(sep='/')[4]
                     repoAuthor = origin.url.split(sep='/')[3]
 
                     repo.git.fetch("-p")
 
-                    ugly_hack = False
                     for branch in origin.refs:
                         if branch.remote_head == "HEAD" or branch.remote_head in branches:
                             pass
@@ -93,8 +93,7 @@ class Loop(commands.Cog):
                                 ponged = True
                             await channel.send(f"New branch: {branch.remote_head} on {repoName}")
 
-                            if origin.refs["HEAD"].commit in list(repo.iter_commits(branch.name)):
-                                ugly_hack = True
+                            newBranches.append(branch.remote_head)
 
                     for branch in repo.branches:
                         if branch.tracking_branch() not in origin.refs:
@@ -113,7 +112,7 @@ class Loop(commands.Cog):
 
                         print(
                             f"[{datetime.now().strftime('%H:%M:%S')}] Checking: {repoName} - {branch.name}")
-                        if ugly_hack:
+                        if branch.name in newBranches and origin.refs["HEAD"].commit in list(repo.iter_commits(branch.name)):
                             occ = len(list(repo.iter_commits(origin.refs["HEAD"].name)))
                         else:
                             occ = len(list(repo.iter_commits(branch.name)))
