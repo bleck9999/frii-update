@@ -313,9 +313,9 @@ class Loop(commands.Cog):
                                 mergedAt = datetime.strptime(pull["mergedAt"], "%Y-%m-%dT%H:%M:%SZ")
                                 if mergedAt > lastcheck:
                                     await channel.send(
-                                        f"{repoName} - PR #{pull['number']} merged at {mergedAt} by {pull['mergedBy']['login']}")
+                                        f"{repoName} - {pull['title']} (#{pull['number']}) merged at {mergedAt} by {pull['mergedBy']['login']}")
                             elif closedAt > lastcheck:
-                                await channel.send(f"{repoName} - PR #{pull['number']} closed at {closedAt}")
+                                await channel.send(f"{repoName} - {pull['title']} (#{pull['number']}) closed at {closedAt}")
 
                 # this way pulls don't get re-detected every time the bot restarts
                 lastcheck = datetime.utcnow()
