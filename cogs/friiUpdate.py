@@ -21,7 +21,8 @@ class Loop(commands.Cog):
         self.role = int(self.conf["Config"]["Role ID"])
         self.PRlimit = int(self.conf["Config"]["Pull limit"])
         self.CommentLimit = int(self.conf["Config"]["Comment limit"])
-        self.Rlimit = int(self.conf["Config"]["Review limit"])
+        self.RVlimit = int(self.conf["Config"]["Review limit"])
+        self.RLlimit = int(self.conf["Config"]["Release limit"])
         self.interval = int(self.conf["Config"]["Interval"])
 
         with open("info.json", "r") as j:
@@ -172,25 +173,38 @@ class Loop(commands.Cog):
                                                   author["user"]["login"],
                                                   author["user"]["url"],
                                                   author["avatarUrl"],
-                                                  i
-                                                  )
+                                                  i)
 
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching GitHub information for {repoName}")
                     req = """
-                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $Rlimit:Int!) {
+                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $RVlimit:Int!, $RLlimit:Int!) {
                         repository(owner:$owner, name:$repo_name) {
                           pullRequests(last:$Plimit) {
-                            edges {
-                              node {
+                            nodes {
+                              author {
+                                avatarUrl
+                                login
+                                url
+                              }
+                              body
+                              closed
+                              closedAt
+                              comments (last: $Climit) { nodes {
                                 author {
                                   avatarUrl
                                   login
                                   url
                                 }
                                 body
-                                closed
-                                closedAt
+                                createdAt
+                                url
+                              }}
+                              reviews (last: $RVlimit) { nodes {
+                                author {
+                                  avatarUrl
+                                  login
+                                  url
+                                }
                                 comments (last: $Climit) { nodes {
                                   author {
                                     avatarUrl
@@ -199,54 +213,52 @@ class Loop(commands.Cog):
                                   }
                                   body
                                   createdAt
+                                  diffHunk
                                   url
                                 }}
-                                reviews (last: $Rlimit) { nodes {
-                                  author {
-                                    avatarUrl
-                                    login
-                                    url
-                                  }
-                                  comments (last: $Climit) { nodes {
-                                    author {
-                                      avatarUrl
-                                      login
-                                      url
-                                    }
-                                    body
-                                    createdAt
-                                    diffHunk
-                                    url
-                                  }}
-                                  body
-                                  createdAt
-                                  state
-                                  url
-                                }}
+                                body
                                 createdAt
-                                isDraft
-                                merged
-                                mergedAt
-                                mergedBy {login}
-                                number
-                                title
+                                state
                                 url
+                              }}
+                              createdAt
+                              isDraft
+                              merged
+                              mergedAt
+                              mergedBy {login}
+                              number
+                              title
+                              url
                             }
                           }
-                        }
+                          releases (last: $RLlimit){
+                            nodes {
+                              author { 
+                                login
+                                url
+                                avatarUrl
+                              }
+                              description
+                              isPrerelease
+                              name
+                              publishedAt
+                              url
+                            }
+                          }
                       }
                     }"""
                     params = {"owner": repoAuthor,
                               "repo_name": repoName,
                               "Plimit": self.PRlimit,
                               "Climit": self.CommentLimit,
-                              "Rlimit": self.Rlimit
+                              "RVlimit": self.RVlimit,
+                              "RLlimit": self.RLlimit
                               }
                     result = await session.execute(gql(req), variable_values=params)
-                    pulls = result["repository"]["pullRequests"]["edges"]
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
+                    pulls = result["repository"]["pullRequests"]["nodes"]
 
-                    for num in range(len(pulls)):
-                        pull = pulls[num]["node"]
+                    for pull in pulls:
                         createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                         if createdAt > lastcheck:
                             if not ponged:
@@ -263,8 +275,7 @@ class Loop(commands.Cog):
                                                   pull["author"]["login"],
                                                   pull["author"]["url"],
                                                   pull["author"]["avatarUrl"],
-                                                  i
-                                                  )
+                                                  i)
 
                         for comment in pull["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -278,8 +289,7 @@ class Loop(commands.Cog):
                                                       comment["author"]["login"],
                                                       comment["author"]["url"],
                                                       comment["author"]["avatarUrl"],
-                                                      i
-                                                      )
+                                                      i)
 
                         for review in pull["reviews"]["nodes"]:
                             RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -294,8 +304,7 @@ class Loop(commands.Cog):
                                                       review['author']['login'],
                                                       review['author']['url'],
                                                       review['author']['avatarUrl'],
-                                                      i
-                                                      )
+                                                      i)
 
                                 for comment in review['comments']["nodes"]:
                                     CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -317,7 +326,25 @@ class Loop(commands.Cog):
                             elif closedAt > lastcheck:
                                 await channel.send(f"{repoName} - {pull['title']} (#{pull['number']}) closed at {closedAt}")
 
-                # this way pulls don't get re-detected every time the bot restarts
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking releases for {repoName}")
+                    releases = result["repository"]["releases"]["nodes"]
+                    for release in releases:
+                        publishedAt = datetime.strptime(release["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        if publishedAt > lastcheck:
+                            if not ponged:
+                                await channel.send(f"<@&{self.role}> New release detected!")
+                            await self.send_embed(channel,
+                                                  f"{repoName} - {'[PRERELEASE]' if release['isPrerelease'] else ''} Release {release['name']}",
+                                                  release["url"],
+                                                  release["description"],
+                                                  "Published on: ",
+                                                  publishedAt,
+                                                  review["author"]["login"],
+                                                  review["author"]["url"],
+                                                  review["author"]["avatarUrl"],
+                                                  i)
+
+                # this way things don't get re-detected every time the bot restarts
                 lastcheck = datetime.utcnow()
                 self.conf["Config"]["Last checked"] = lastcheck.strftime("%H%M%S %d%m%Y")
                 with open("frii_update.ini", "w") as confFile:
