@@ -35,7 +35,10 @@ class Loop(commands.Cog):
 
     async def send_embed(self, channel, title, url, description, datemsg, date, author, author_url, thumbnail, i):
         embed = discord.Embed(title=title, color=self.repos[i][1])
-        embed.set_author(name=author, url=author_url)
+        if author_url != "null":
+            embed.set_author(name=author, url=author_url)
+        else:
+            embed.set_author(name=author)
         embed.set_thumbnail(url=thumbnail)
         embed.url = url
         if len(description) >= 2000:
@@ -156,8 +159,13 @@ class Loop(commands.Cog):
                         for index in reversed(range(ncc)):
                             commit = Clist[index]
                             author = result["repository"]["ref"]["target"]["history"]["edges"][index]["node"]["author"]
-                            # oh by the way author["user"] can be null if the git email doesn't
-                            # match any github account
+
+                            if author["user"] is None: # fukin edge cases reeeee
+                                login = commit.author.name
+                                authorUrl = "null"
+                            else:
+                                login = author["user"]["login"]
+                                authorUrl = author["user"]["url"]
 
                             if not ponged:
                                 await channel.send(
@@ -170,8 +178,8 @@ class Loop(commands.Cog):
                                                   commit.message,
                                                   "Committed on ",
                                                   time.asctime(time.gmtime(commit.committed_date)),
-                                                  author["user"]["login"],
-                                                  author["user"]["url"],
+                                                  login,
+                                                  authorUrl,
                                                   author["avatarUrl"],
                                                   i)
 
