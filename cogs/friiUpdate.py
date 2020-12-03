@@ -7,7 +7,9 @@ from datetime import datetime
 import discord
 import git
 from discord.ext import commands
-from gql import gql, AIOHTTPTransport, Client
+from gql import gql, Client
+from gql.transport.aiohttp import AIOHTTPTransport
+
 
 from cogs import sysupdates
 
