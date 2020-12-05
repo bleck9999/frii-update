@@ -316,15 +316,15 @@ class Loop(commands.Cog):
                                                       review['author']['avatarUrl'],
                                                       i)
 
-                                for comment in review['comments']["nodes"]:
-                                    CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
-                                    if CcreatedAt > lastcheck:
-                                        embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
-                                        embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
-                                        embed.insert_field_at(0, name="Comment", value=comment['body'])
-                                        embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+                            for comment in review['comments']["nodes"]:
+                                CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                if CcreatedAt > lastcheck:
+                                    embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
+                                    embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
+                                    embed.insert_field_at(0, name="Comment", value=comment['body'])
+                                    embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
 
-                                        await channel.send(embed=embed)
+                                    await channel.send(embed=embed)
 
                         if pull["closed"]:
                             closedAt = datetime.strptime(pull["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -343,6 +343,7 @@ class Loop(commands.Cog):
                         if publishedAt > lastcheck:
                             if not ponged:
                                 await channel.send(f"<@&{self.role}> New release detected!")
+                                ponged = True
                             await self.send_embed(channel,
                                                   f"{repoName} - {'[PRERELEASE]' if release['isPrerelease'] else ''} Release {release['name']}",
                                                   release["url"],
