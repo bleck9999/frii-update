@@ -224,6 +224,7 @@ class Loop(commands.Cog):
                                   body
                                   createdAt
                                   diffHunk
+                                  id
                                   url
                                 }}
                                 body
@@ -304,7 +305,9 @@ class Loop(commands.Cog):
                         for review in pull["reviews"]["nodes"]:
                             RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                             if RcreatedAt > lastcheck and review['body']:
-                                # github is fantastic and creates a new review for *any* review comment, its not worth sending this every time that happens
+                                # the way reviews work is completely insane
+                                # github is fantastic and creates a new review with no body for *any* review comment
+                                # there's no point sending this every time that happens.
                                 await self.send_embed(channel,
                                                       f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
                                                       review['url'],
@@ -321,8 +324,14 @@ class Loop(commands.Cog):
                                 if CcreatedAt > lastcheck:
                                     embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
                                     embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
-                                    embed.insert_field_at(0, name="Comment", value=comment['body'])
-                                    embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+                                    if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
+                                        embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
+                                    else:
+                                        embed.insert_field_at(0, name="Comment", value=comment['body'])
+                                    if len(comment['diffHunk']) > 1020:
+                                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Diff not shown for review comment {comment['id']}")
+                                    else:
+                                        embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
 
                                     await channel.send(embed=embed)
 
