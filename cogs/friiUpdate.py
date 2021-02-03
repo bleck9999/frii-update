@@ -126,6 +126,7 @@ class Loop(commands.Cog):
                         repo.git.pull()
                         Clist = list(repo.iter_commits(branch.name))
                         ncc = len(Clist) - occ
+                        res = []
 
                         if ncc > 0:
                             req = """query($owner:String!, $name:String!, $branch:String!, $ncc:Int!) {
@@ -135,7 +136,6 @@ class Loop(commands.Cog):
                                     ... on Commit {
                                       history(first: $ncc) {
                                         pageInfo {
-                                          hasNextPage
                                           endCursor
                                         }
                                         edges {
@@ -155,12 +155,47 @@ class Loop(commands.Cog):
                             params = {"owner": repoAuthor,
                                       "name": repoName,
                                       "branch": branch.name,
-                                      "ncc": ncc}
+                                      "ncc": ncc if ncc <= 100 else 100}
                             result = await session.execute(gql(req), variable_values=params)
+                            res = result["repository"]["ref"]["target"]["history"]["edges"]
+                        if ncc > 100:
+                            req = """query($owner:String!, $name:String!, $branch:String!, $cursor:String, $count:Int!) {
+                                      repository(owner: $owner, name: $name) {
+                                        ref(qualifiedName: $branch) {
+                                          target {
+                                            ... on Commit {
+                                              history(after: $cursor, first: $count) {
+                                                pageInfo {
+                                                  endCursor
+                                                }
+                                                edges {
+                                                  node {
+                                                    author {
+                                                      avatarUrl
+                                                      user {login url}
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }"""
+                            left = ncc-100
+                            while left > 0:
+                                params = {"owner": repoAuthor,
+                                          "name": repoName,
+                                          "branch": branch.name,
+                                          "cursor": result["repository"]["ref"]["target"]["history"]["pageInfo"]["endCursor"],
+                                          "count": left if left <= 100 else 100}
+                                result = await session.execute(gql(req), variable_values=params)
+                                res += result["repository"]["ref"]["target"]["history"]["edges"]
+                                left -= 100
 
                         for index in reversed(range(ncc)):
                             commit = Clist[index]
-                            author = result["repository"]["ref"]["target"]["history"]["edges"][index]["node"]["author"]
+                            author = res[index]["node"]["author"]
 
                             if author["user"] is None: # fukin edge cases reeeee
                                 login = commit.author.name
