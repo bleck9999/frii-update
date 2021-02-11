@@ -209,6 +209,7 @@ class Loop(commands.Cog):
                                     f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
                                 ponged = True
 
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] New commit detected! ID: {commit.hexsha}")
                             await self.send_embed(channel,
                                                   f"{repoName}: {commit.hexsha} on {branch.name}",
                                                   f"{origin.url}/commit/{commit.hexsha}",
