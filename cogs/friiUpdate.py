@@ -359,6 +359,7 @@ class Loop(commands.Cog):
                                 CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                                 if CcreatedAt > lastcheck:
                                     embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
+                                    embed.url = comment["url"]
                                     embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
                                     if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
                                         embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
