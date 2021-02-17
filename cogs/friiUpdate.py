@@ -212,7 +212,7 @@ class Loop(commands.Cog):
                             print(f"[{datetime.now().strftime('%H:%M:%S')}] New commit detected! ID: {commit.hexsha}")
                             await self.send_embed(channel,
                                                   f"{repoName}: {commit.hexsha} on {branch.name}",
-                                                  f"{origin.url}/commit/{commit.hexsha}",
+                                                  f"https://github.com/{repoAuthor}/{repoName}/commit/{commit.hexsha}",
                                                   commit.message,
                                                   "Committed on ",
                                                   time.asctime(time.gmtime(commit.committed_date)),
