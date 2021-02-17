@@ -1,0 +1,3 @@
+[submodule "frii-config"]
+	path = frii-config
+	url = https://github.com/bleck9999/frii-config
