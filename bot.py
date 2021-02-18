@@ -15,7 +15,7 @@ class FriiUpdate(commands.Bot):
         self.role = int(config["Config"]["Role ID"])
 
     # Exception handling modified from nh-server/Kurisu
-    # Licensed under apache 2 (https://www.apache.org/licenses/LICENSE-2.0)
+    # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
         channel = await self.fetch_channel(int(config["Config"]["Channel ID"]))
         await channel.send(f"<@&{self.role}> an unhandled exception has occurred")
