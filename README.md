@@ -1,17 +1,27 @@
-welcome to bootleg github webhook for discord
+Instructions (Professionalism edition™)
+1. Clone this repo including the submodule (frii-config)
+2. Install frii-config. It's not in the requirements.txt for the very reasonable reason of it's actually a dependency for frii-config, not frii-update
+3. Run frii-config (`frii-config/configurator.py`) and add any repositories you want to track
+4. Rename `frii_update_example.ini` to `frii_update.ini` and replace in the default values with your text editor of choice. Details on what each option does can be found below.
+5. Install frii-update's dependencies (you can do this with `pip install -r requirements.txt`)
+6. Run the bot
+7. Send `.start` in a channel the bot can see 
 
-i dont expect people to actually use this but i mean it works™
+## Configuration
 
-instructions ("we have an app for that" edition)
-1. clone this repo (make sure you use the `--recursive` or `--recurse-submodules` option)
-2. install PySide6 (`pip install PySide6`)  
-3. run frii-config (`frii-config/configurator.py`) and add the repositories you want to track
-4. rename `frii_update_example.ini` to `frii_update.ini` and fill in the values with your text editor of choice
-5. install frii-update's dependencies (you can do this with `pip install -r requirements.txt`)
-6. run the bot (`bot.py`)
-7. send `.start` in a channel the bot can see 
+|Option |Type |Purpose |
+--- | --- | ---
+Role ID | `Int` | The discord ID of the role to ping for alerts (required)
+Channel ID | `Int` | The discord ID of the channel to send messages to (required)
+Check sysupdates | `Bool` | Whether or not to check for Nintendo switch system updates. If enabled, it uses [this](https://yls8.mtheall.com/ninupdates/feed.php) RSS feed.
+Pull limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
+Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
+Review limit | `Int` | The maximum number of reviews to fetch. Requires pull limit to be > 0. Set to 0 to disable.
+Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.
+Issue limit | `Int` | The maximum number of issues to fetch. Set to 0 to disable.
+Interval | `Int` | The amount of time to wait (in seconds) before each check
 
-Optionally you can enable tracking system updates for the nintendo switch.
-It uses the rss feed [here](https://yls8.mtheall.com/ninupdates/feed.php).
-
-To enable this feature, open `frii_update.ini` and change do_sysupdates to `True`.
+After one complete cycle, a new entry will be added named `Last Checked`.
+This is not meant to be edited under normal circumstances, but I can't stop you from doing so if you wish.
+It stores the last time the bot checked in the strftime format `%H%M%S %d%m%Y`.
+Note that this is only used for checks involving the GitHub API.
