@@ -25,6 +25,7 @@ class Loop(commands.Cog):
         self.CommentLimit = int(self.conf["Config"]["Comment limit"])
         self.RVlimit = int(self.conf["Config"]["Review limit"])
         self.RLlimit = int(self.conf["Config"]["Release limit"])
+        self.IssueLimit = int(self.conf["Config"]["Issue limit"])
         self.interval = int(self.conf["Config"]["Interval"])
 
         with open("info.json", "r") as j:
@@ -221,36 +222,94 @@ class Loop(commands.Cog):
                                                   author["avatarUrl"],
                                                   i)
 
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching GitHub information for {repoName}")
-                    req = """
-                    query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $RVlimit:Int!, $RLlimit:Int!) {
-                        repository(owner:$owner, name:$repo_name) {
-                          pullRequests(last:$Plimit) {
-                            nodes {
-                              author {
-                                avatarUrl
-                                login
-                                url
-                              }
-                              body
-                              closed
-                              closedAt
-                              comments (last: $Climit) { nodes {
-                                author {
-                                  avatarUrl
+                    if self.PRlimit + self.CommentLimit + self.RVlimit + self.RLlimit + self.Ilimit > 0:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching GitHub information for {repoName}")
+                        if self.CommentLimit == 0 and self.RVlimit > 0:
+                            print("Warning: Comment limit set to 0 but Review limit > 0, this may cause unintended behaviour")
+                        if self.PRlimit == 0 and self.RVlimit > 0:
+                            print(f"Ignoring Review limit of {self.RVlimit} since Pull request limit is 0")
+                            self.RVlimit = 0
+
+                        # right what's about to happen probably needs some explanation
+                        # i dont want to copy the same massive fuck off string for every configuration you could have
+                        # k thanks end of explanation
+                        req = """
+                        query ($owner:String!, $repo_name:String!, $Plimit:Int!, $Climit:Int!, $RVlimit:Int!, $RLlimit:Int!, $Ilimit:Int!){
+                            repository(owner:$owner, name:$repo_name){""" + """
+                              pullRequests(last:$Plimit){
+                                nodes {
+                                  author {
+                                    avatarUrl
+                                    login
+                                    url
+                                  }
+                                  body
+                                  closed
+                                  closedAt""" if self.PRlimit > 0 else '' + """
+                                  comments (last: $Climit){ nodes {
+                                    author {
+                                      avatarUrl
+                                      login
+                                      url
+                                    }
+                                    body
+                                    createdAt
+                                    url
+                                  }}""" if self.CommentLimit > 0 and self.PRlimit > 0 else '' + """
+                                  reviews (last: $RVlimit){ nodes {
+                                    author {
+                                      avatarUrl
+                                      login
+                                      url
+                                    }""" if self.RVlimit > 0 else '' + """
+                                    comments (last: $Climit){ nodes {
+                                      author {
+                                        avatarUrl
+                                        login
+                                        url
+                                      }
+                                      body
+                                      createdAt
+                                      diffHunk
+                                      id
+                                      url
+                                    }}""" if self.RVlimit > 0 and self.CommentLimit > 0 else '' + """
+                                    body
+                                    createdAt
+                                    state
+                                    url
+                                  }}""" if self.RVlimit > 0 else '' + """
+                                  createdAt
+                                  isDraft
+                                  merged
+                                  mergedAt
+                                  mergedBy {login}
+                                  number
+                                  title
+                                  url
+                                }
+                              }""" if self.PRlimit > 0 else '' + """
+                              releases (last: $RLlimit){ nodes {
+                                author { 
                                   login
                                   url
+                                  avatarUrl
+                                }
+                                description
+                                isPrerelease
+                                name
+                                publishedAt
+                                url
+                              }}""" if self.RLlimit > 0 else '' + """
+                              issues (last: $Ilimit){ nodes {
+                                author {
+                                  login
+                                  url
+                                  avatarUrl
                                 }
                                 body
-                                createdAt
-                                url
-                              }}
-                              reviews (last: $RVlimit) { nodes {
-                                author {
-                                  avatarUrl
-                                  login
-                                  url
-                                }
+                                closed
+                                closedAt""" if self.IssueLimit > 0 else '' + """
                                 comments (last: $Climit) { nodes {
                                   author {
                                     avatarUrl
@@ -259,52 +318,29 @@ class Loop(commands.Cog):
                                   }
                                   body
                                   createdAt
-                                  diffHunk
-                                  id
                                   url
-                                }}
-                                body
+                                }}""" if self.CommentLimit > 0 and self.IssueLimit > 0 else '' + """
                                 createdAt
-                                state
+                                number
+                                title
                                 url
-                              }}
-                              createdAt
-                              isDraft
-                              merged
-                              mergedAt
-                              mergedBy {login}
-                              number
-                              title
-                              url
-                            }
+                              }""" if self.IssueLimit > 0 else '' + """
                           }
-                          releases (last: $RLlimit){
-                            nodes {
-                              author { 
-                                login
-                                url
-                                avatarUrl
-                              }
-                              description
-                              isPrerelease
-                              name
-                              publishedAt
-                              url
-                            }
-                          }
-                      }
-                    }"""
-                    params = {"owner": repoAuthor,
-                              "repo_name": repoName,
-                              "Plimit": self.PRlimit,
-                              "Climit": self.CommentLimit,
-                              "RVlimit": self.RVlimit,
-                              "RLlimit": self.RLlimit
-                              }
-                    result = await session.execute(gql(req), variable_values=params)
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
-                    pulls = result["repository"]["pullRequests"]["nodes"]
+                        }"""
+                        params = {"owner": repoAuthor,
+                                  "repo_name": repoName,
+                                  "Plimit": self.PRlimit,
+                                  "Climit": self.CommentLimit,
+                                  "RVlimit": self.RVlimit,
+                                  "RLlimit": self.RLlimit,
+                                  "Ilimit": self.IssueLimit
+                                  }
+                        result = await session.execute(gql(req), variable_values=params)
 
+                    pulls = []
+                    if self.PRlimit > 0:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking prs for {repoName}")
+                        pulls = result["repository"]["pullRequests"]["nodes"]
                     for pull in pulls:
                         createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                         if createdAt > lastcheck:
@@ -324,53 +360,56 @@ class Loop(commands.Cog):
                                                   pull["author"]["avatarUrl"],
                                                   i)
 
-                        for comment in pull["comments"]["nodes"]:
-                            CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
-                            if CcreatedAt > lastcheck:
-                                await self.send_embed(channel,
-                                                      f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
-                                                      comment["url"],
-                                                      comment["body"],
-                                                      "Commented on: ",
-                                                      CcreatedAt,
-                                                      comment["author"]["login"],
-                                                      comment["author"]["url"],
-                                                      comment["author"]["avatarUrl"],
-                                                      i)
-
-                        for review in pull["reviews"]["nodes"]:
-                            RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
-                            if RcreatedAt > lastcheck and review['body']:
-                                # the way reviews work is completely insane
-                                # github is fantastic and creates a new review with no body for *any* review comment
-                                # there's no point sending this every time that happens.
-                                await self.send_embed(channel,
-                                                      f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
-                                                      review['url'],
-                                                      review['body'],
-                                                      "Submitted on: ",
-                                                      RcreatedAt,
-                                                      review['author']['login'],
-                                                      review['author']['url'],
-                                                      review['author']['avatarUrl'],
-                                                      i)
-
-                            for comment in review['comments']["nodes"]:
+                        if self.CommentLimit > 0:
+                            for comment in pull["comments"]["nodes"]:
                                 CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
                                 if CcreatedAt > lastcheck:
-                                    embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
-                                    embed.url = comment["url"]
-                                    embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
-                                    if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
-                                        embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
-                                    else:
-                                        embed.insert_field_at(0, name="Comment", value=comment['body'])
-                                    if len(comment['diffHunk']) > 1020:
-                                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Diff not shown for review comment {comment['id']}")
-                                    else:
-                                        embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+                                    await self.send_embed(channel,
+                                                          f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
+                                                          comment["url"],
+                                                          comment["body"],
+                                                          "Commented on: ",
+                                                          CcreatedAt,
+                                                          comment["author"]["login"],
+                                                          comment["author"]["url"],
+                                                          comment["author"]["avatarUrl"],
+                                                          i)
 
-                                    await channel.send(embed=embed)
+                        if self.RVlimit > 0:
+                            for review in pull["reviews"]["nodes"]:
+                                RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                if RcreatedAt > lastcheck and review['body']:
+                                    # the way reviews work is completely insane
+                                    # github is fantastic and creates a new review with no body for *any* review comment
+                                    # there's no point sending this every time that happens.
+                                    await self.send_embed(channel,
+                                                          f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
+                                                          review['url'],
+                                                          review['body'],
+                                                          "Submitted on: ",
+                                                          RcreatedAt,
+                                                          review['author']['login'],
+                                                          review['author']['url'],
+                                                          review['author']['avatarUrl'],
+                                                          i)
+
+                            if self.CommentLimit > 0:
+                                for comment in review['comments']["nodes"]:
+                                    CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                    if CcreatedAt > lastcheck:
+                                        embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
+                                        embed.url = comment["url"]
+                                        embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
+                                        if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
+                                            embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
+                                        else:
+                                            embed.insert_field_at(0, name="Comment", value=comment['body'])
+                                        if len(comment['diffHunk']) > 1020:
+                                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Diff not shown for review comment {comment['id']}")
+                                        else:
+                                            embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+
+                                        await channel.send(embed=embed)
 
                         if pull["closed"]:
                             closedAt = datetime.strptime(pull["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -382,8 +421,52 @@ class Loop(commands.Cog):
                             elif closedAt > lastcheck:
                                 await channel.send(f"{repoName} - {pull['title']} (#{pull['number']}) closed at {closedAt}")
 
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking releases for {repoName}")
-                    releases = result["repository"]["releases"]["nodes"]
+                    issues = []
+                    if self.IssueLimit > 0:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking issues for {repoName}")
+                        issues = result["repository"]["issues"]["nodes"]
+                    for issue in issues:
+                        IcreatedAt = datetime.strptime(issue["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        if IcreatedAt > lastcheck:
+                            if not ponged:
+                                await channel.send(f"<@&{self.role}> New issue(s) detected!")
+                                ponged = True
+
+                            await self.send_embed(channel,
+                                                  f"{repoName}: (#{issue['number']}) - {issue['title']}",
+                                                  issue['url'],
+                                                  issue['body'],
+                                                  "Opened on: ",
+                                                  createdAt,
+                                                  issue["author"]["login"],
+                                                  issue["author"]["url"],
+                                                  issue["author"]["avatarUrl"],
+                                                  i)
+                        # me when i
+                        if self.CommentLimit > 0:  # when i duplicated code fragment (14 lines long)
+                            for comment in issue["comments"]["nodes"]:
+                                CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                if CcreatedAt > lastcheck:
+                                    await self.send_embed(channel,
+                                                          f"{repoName} - New comment on {issue['title']} (#{issue['number']})",
+                                                          comment["url"],
+                                                          comment["body"],
+                                                          "Commented on: ",
+                                                          CcreatedAt,
+                                                          comment["author"]["login"],
+                                                          comment["author"]["url"],
+                                                          comment["author"]["avatarUrl"],
+                                                          i)
+
+                        if issue["closed"]:
+                            closedAt = datetime.strptime(issue["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            if closedAt > lastcheck:
+                                await channel.send(f"{repoName} - {issue['title']} (#{issue['number']}) closed at {closedAt}")
+
+                    releases = []
+                    if self.RLlimit > 0:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking releases for {repoName}")
+                        releases = result["repository"]["releases"]["nodes"]
                     for release in releases:
                         publishedAt = datetime.strptime(release["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
                         if publishedAt > lastcheck:
