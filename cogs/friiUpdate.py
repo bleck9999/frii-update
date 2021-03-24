@@ -338,7 +338,7 @@ class Loop(commands.Cog):
                                 url
                               }}""" if self.Ilimit > 0 else '') + """
                             }
-                        }"""
+                        }"""                                                        # graphQL was a mistake
                         params = {"owner": repoAuthor,
                                   "repo_name": repoName}
                         for x in using:

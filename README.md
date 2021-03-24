@@ -15,7 +15,7 @@ Role ID | `Int` | The discord ID of the role to ping for alerts (required)
 Channel ID | `Int` | The discord ID of the channel to send messages to (required)
 Check sysupdates | `Bool` | Whether or not to check for Nintendo switch system updates. If enabled, it uses [this](https://yls8.mtheall.com/ninupdates/feed.php) RSS feed.
 Pull limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
-Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
+Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable. Due to how reviews work setting this to zero is not recommended when review limit > 0.
 Review limit | `Int` | The maximum number of reviews to fetch. Requires pull limit to be > 0. Set to 0 to disable.
 Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.
 Issue limit | `Int` | The maximum number of issues to fetch. Set to 0 to disable.
