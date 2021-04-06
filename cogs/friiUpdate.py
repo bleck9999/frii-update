@@ -487,9 +487,9 @@ class Loop(commands.Cog):
                                                   release["description"],
                                                   "Published on: ",
                                                   publishedAt,
-                                                  review["author"]["login"],
-                                                  review["author"]["url"],
-                                                  review["author"]["avatarUrl"],
+                                                  release["author"]["login"],
+                                                  release["author"]["url"],
+                                                  release["author"]["avatarUrl"],
                                                   i)
 
                 # this way things don't get re-detected every time the bot restarts
