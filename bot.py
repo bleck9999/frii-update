@@ -1,17 +1,23 @@
 import configparser
+import os
+
 from discord import Intents
 from discord.ext import commands
 from traceback import format_exception
 
 config = configparser.ConfigParser()
 config.read("frii_update.ini")
+cogs = []
+for cog in os.listdir("cogs"):
+    if os.path.isfile(f"cogs/{cog}") and cog.split('.')[1] == 'py':
+        cogs.append(f"cogs.{cog.split('.')[0]}")
 
 
 class FriiUpdate(commands.Bot):
     def __init__(self, command_prefix, **options):
         super().__init__(command_prefix, **options)
-        self.load_extension("cogs.sysupdates")
-        self.load_extension("cogs.friiUpdate")
+        for cog in cogs:
+            self.load_extension(cog)
         self.role = int(config["Config"]["Role ID"])
 
     # Exception handling modified from nh-server/Kurisu
