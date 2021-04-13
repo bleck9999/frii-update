@@ -71,7 +71,7 @@ async def start(ctx):
         config["Config"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
         with open("frii_update.ini", "w") as confFile:
             config.write(confFile)
-        await asyncio.sleep()
+        await asyncio.sleep(bot.interval)
 
 
 @bot.command()
