@@ -5,15 +5,18 @@ import feedparser
 from discord.ext import commands
 
 
-class friiRSS(commands.Cog):
-    async def check_sysupdates(self, ponged, roleid, channel):
+class Loop(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
+    async def main(self, channel):
+        roleid = self.bot.role
         with open("info.json") as j:
             js = json.load(j)
             entries = js["sysupdates"]
 
         now = datetime.now().strftime("%H:%M:%S")
-        print(f"[{now}] Checking for sysupdates")
+        print(f"[{now}] - sysupdates: Checking for sysupdates")
 
         feed = feedparser.parse("https://yls8.mtheall.com/ninupdates/feed.php")
         for entry in feed.entries:
@@ -21,9 +24,9 @@ class friiRSS(commands.Cog):
                 continue
             version = entry.title[7:]
             if version not in entries:
-                if not ponged:
+                if not self.bot.ponged:
                     await channel.send(f"<@&{roleid}> New firmware version detected!")
-                    ponged = True
+                    self.bot.ponged = True
                 await channel.send(f"Version {version} released on: {entry.published}")
                 entries.append(version)
 
@@ -32,8 +35,6 @@ class friiRSS(commands.Cog):
             j.seek(0, 0)
             json.dump(js, j)
 
-        return ponged
-
 
 def setup(bot):
-    bot.add_cog(friiRSS(bot))
+    bot.add_cog(Loop(bot))

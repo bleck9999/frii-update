@@ -24,4 +24,8 @@ Interval | `Int` | The amount of time to wait (in seconds) before each check
 After one complete cycle, a new entry will be added named `Last Checked`.
 This is not meant to be edited under normal circumstances, but I can't stop you from doing so if you wish.
 It stores the last time the bot checked in the strftime format `%H%M%S %d%m%Y`.
-Note that this is only used for checks involving the GitHub API.
+
+As per the regularly scheduled increase in project scope frii update will now attempt to load any .py
+file in the `cogs` directory, then execute its `Loop.main()` function with one parameter,
+channel: a discord.py channel object fetched from the ID in `frii_update.ini`.  
+That is all.
