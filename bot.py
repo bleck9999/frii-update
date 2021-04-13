@@ -62,12 +62,14 @@ async def start(ctx):
     channel = await bot.fetch_channel(config["Config"]["Channel ID"])
 
     while True:
+        bot.ponged = False
         for cog in cogs:
             obj = globals()[cog].Loop(bot)
             await obj.main(channel)
             # maybe at some point i'll use decorators and do it the "proper" way
             # that day is not today
 
+        bot.lastcheck = datetime.datetime.utcnow()
         config["Config"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
         with open("frii_update.ini", "w") as confFile:
             config.write(confFile)

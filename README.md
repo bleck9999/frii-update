@@ -1,6 +1,6 @@
 Instructions (Professionalism edition™)
 1. Clone this repo including the submodule (frii-config)
-2. Install frii-config. It's not in the requirements.txt for the very reasonable reason of it's actually a dependency for frii-config, not frii-update
+2. Install pyside6. It's not in the requirements.txt for the very reasonable reason of it's actually a dependency for frii-config, not frii-update
 3. Run frii-config (`frii-config/configurator.py`) and add any repositories you want to track
 4. Rename `frii_update_example.ini` to `frii_update.ini` and replace in the default values with your text editor of choice. Details on what each option does can be found below.
 5. Install frii-update's dependencies (you can do this with `pip install -r requirements.txt`)
