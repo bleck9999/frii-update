@@ -15,8 +15,7 @@ class Loop(commands.Cog):
             js = json.load(j)
             entries = js["sysupdates"]
 
-        now = datetime.now().strftime("%H:%M:%S")
-        print(f"[{now}] - sysupdates: Checking for sysupdates")
+        self.bot.log("Checking for sysupdates")
 
         feed = feedparser.parse("https://yls8.mtheall.com/ninupdates/feed.php")
         for entry in feed.entries:

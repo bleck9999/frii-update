@@ -28,4 +28,4 @@ It stores the last time the bot checked in the strftime format `%H%M%S %d%m%Y`.
 As per the regularly scheduled increase in project scope frii update will now attempt to load any .py
 file in the `cogs` directory, then execute its `Loop.main()` function with one parameter,
 channel: a discord.py channel object fetched from the ID in `frii_update.ini`.  
-That is all.
+It's encouraged to use FriiUpdate's staticmethod `log(text)` over your own print statements where possible.

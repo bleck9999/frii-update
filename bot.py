@@ -2,6 +2,7 @@ import asyncio
 import configparser
 import datetime
 import importlib
+import inspect
 import os
 
 from discord import Intents
@@ -26,6 +27,12 @@ class FriiUpdate(commands.Bot):
         self.lastcheck = datetime.datetime.utcnow()
         self.interval = int(config["Config"]["Interval"])
         self.ponged = False
+
+    @staticmethod
+    def log(text):
+        now = datetime.datetime.now().strftime("%H:%M:%S")
+        caller = inspect.stack()[1].filename.split('/')[-1][:-3]
+        print(f"[{now}] - {caller}: {text}")
 
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
@@ -81,6 +88,3 @@ async def interval(ctx, time):
 
 print("Run bot")
 bot.run(config["Tokens"]["Discord"])
-
-# TODO:
-# global log function to replace print(f"")

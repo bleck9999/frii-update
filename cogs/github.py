@@ -99,8 +99,7 @@ class Loop(commands.Cog):
                         repo.git.branch("-D", branch.name)
                         continue
 
-                    print(
-                        f"[{datetime.now().strftime('%H:%M:%S')}] - github: Checking: {repoName} - {branch.name}")
+                    self.bot.log(f"Checking: {repoName} - {branch.name}")
                     if branch.name in newBranches and origin.refs["HEAD"].commit in list(repo.iter_commits(branch.name)):
                         occ = len(list(repo.iter_commits(origin.refs["HEAD"].name)))
                     else:
@@ -192,7 +191,7 @@ class Loop(commands.Cog):
                                 f"<@&{self.role}> New commit{'s' if ncc > 1 else ''} detected!")
                             self.bot.ponged = True
 
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] - github: New commit detected! ID: {commit.hexsha}")
+                        self.bot.log(f"New commit detected! ID: {commit.hexsha}")
                         await self.send_embed(channel,
                                               f"{repoName}: {commit.hexsha} on {branch.name}",
                                               f"https://github.com/{repoAuthor}/{repoName}/commit/{commit.hexsha}",
@@ -205,11 +204,11 @@ class Loop(commands.Cog):
                                               i)
 
                 if self.Plimit + self.RVlimit + self.RLlimit + self.Ilimit > 0:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] - github: Fetching GitHub information for {repoName}")
+                    self.bot.log(f"Fetching GitHub information for {repoName}")
                     if self.Climit == 0 and self.RVlimit > 0:
-                        print("Warning: Comment limit set to 0 but Review limit > 0, this may cause unintended behaviour")
+                        self.bot.log("Warning: Comment limit set to 0 but Review limit > 0, this may cause unintended behaviour")
                     if self.Plimit == 0 and self.RVlimit > 0:
-                        print(f"Ignoring Review limit of {self.RVlimit} since Pull request limit is 0")
+                        self.bot.log(f"Ignoring Review limit of {self.RVlimit} since Pull request limit is 0")
                         self.RVlimit = 0
 
                     # i wouldnt have to do any of this
@@ -329,7 +328,7 @@ class Loop(commands.Cog):
 
                 pulls = []
                 if self.Plimit > 0:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] - github: Checking prs for {repoName}")
+                    self.bot.log(f"Checking prs for {repoName}")
                     pulls = result["repository"]["pullRequests"]["nodes"]
                 for pull in pulls:
                     createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -395,7 +394,7 @@ class Loop(commands.Cog):
                                         else:
                                             embed.insert_field_at(0, name="Comment", value=comment['body'])
                                         if len(comment['diffHunk']) > 1020:
-                                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Diff not shown for review comment {comment['id']}")
+                                            self.bot.log(f"Diff not shown for review comment {comment['id']}")
                                         else:
                                             embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
 
@@ -413,7 +412,7 @@ class Loop(commands.Cog):
 
                 issues = []
                 if self.Ilimit > 0:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] - github: Checking issues for {repoName}")
+                    self.bot.log(f"Checking issues for {repoName}")
                     issues = result["repository"]["issues"]["nodes"]
                 for issue in issues:
                     createdAt = datetime.strptime(issue["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
@@ -455,7 +454,7 @@ class Loop(commands.Cog):
 
                 releases = []
                 if self.RLlimit > 0:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking releases for {repoName}")
+                    self.bot.log(f"Checking releases for {repoName}")
                     releases = result["repository"]["releases"]["nodes"]
                 for release in releases:
                         publishedAt = datetime.strptime(release["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
