@@ -11,10 +11,6 @@ from traceback import format_exception
 
 config = configparser.ConfigParser()
 config.read("frii_update.ini")
-cogs = []
-for cog in os.listdir("cogs"):
-    if os.path.isfile(f"cogs/{cog}") and cog.split('.')[1] == 'py':
-        cogs.append(cog.split('.')[0])
 
 
 class FriiUpdate(commands.Bot):
@@ -28,11 +24,16 @@ class FriiUpdate(commands.Bot):
         self.interval = int(config["Config"]["Interval"])
         self.ponged = False
 
+    async def on_ready(self):
+        self.log("Ready!")
+
     @staticmethod
     def log(text):
         now = datetime.datetime.now().strftime("%H:%M:%S")
         caller = inspect.stack()[1].filename.split('/')[-1][:-3]
         print(f"[{now}] - {caller}: {text}")
+
+
 
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
@@ -48,6 +49,14 @@ class FriiUpdate(commands.Bot):
         for page in error_paginator.pages:
             await channel.send(page)
 
+
+cogs = []
+for cog in os.listdir("cogs"):
+    cog = cog.split('.')[0]
+    if os.path.isfile(f"cogs/{cog}.py"):
+        if config["Modules"][cog].lower() == "true":
+            FriiUpdate.log(f"Loading {cog}.py")
+            cogs.append(cog)
 
 intents = Intents.none()
 intents.messages = True
@@ -88,5 +97,5 @@ async def interval(ctx, time):
     bot.time = int(time)
     await ctx.send(f"Interval set to {time} seconds")
 
-print("Run bot")
+bot.log("Connecting...")
 bot.run(config["Tokens"]["Discord"])
