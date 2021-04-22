@@ -33,8 +33,6 @@ class FriiUpdate(commands.Bot):
         caller = inspect.stack()[1].filename.split('/')[-1][:-3]
         print(f"[{now}] - {caller}: {text}")
 
-
-
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):

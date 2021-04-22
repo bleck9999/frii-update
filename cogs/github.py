@@ -10,6 +10,8 @@ from discord.ext import commands
 from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
 
+GHtimestring = "%Y-%m-%dT%H:%M:%SZ"
+
 
 class Loop(commands.Cog):
     def __init__(self, bot):
@@ -23,6 +25,7 @@ class Loop(commands.Cog):
         self.RVlimit = int(self.conf["Config"]["Review limit"])
         self.RLlimit = int(self.conf["Config"]["Release limit"])
         self.Ilimit = int(self.conf["Config"]["Issue limit"])
+        self.PClimit = int(self.conf["Config"]["Commit limit"])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -216,11 +219,11 @@ class Loop(commands.Cog):
                     # always, no way to turn it off
                     # fucks sake
                     args = ["$Plimit:Int!", "$Climit:Int!", "$RVlimit:Int!",
-                            "$RLlimit:Int!", "$Ilimit:Int!"]
+                            "$RLlimit:Int!", "$Ilimit:Int!", "$PClimit:Int!"]
                     using = []
                     for x in args:
                         if eval(f"self.{x.split(sep=':')[0][1:]}") > 0:  # look i know
-                            using.append(x)                              # but im annoyed
+                            using.append(x)                              # no excuses anymore
 
                     # right what's about to happen probably needs some explanation
                     # i dont want to copy the same massive fuck off string for every configuration you could have
@@ -249,6 +252,19 @@ class Loop(commands.Cog):
                                 createdAt
                                 url
                               }}""" if self.Climit > 0 and self.Plimit > 0 else '') + ("""
+                              commits (last: $PClimit){ nodes {
+                                commit {
+                                  committedDate
+                                  author {
+                                    avatarUrl
+                                    name
+                                    user {login url}
+                                  }
+                                  message
+                                  oid
+                                  url
+                                }
+                              }}""" if self.PClimit > 0 else '') + ("""
                               reviews (last: $RVlimit){ nodes {
                                 author {
                                   avatarUrl
@@ -331,7 +347,7 @@ class Loop(commands.Cog):
                     self.bot.log(f"Checking prs for {repoName}")
                     pulls = result["repository"]["pullRequests"]["nodes"]
                 for pull in pulls:
-                    createdAt = datetime.strptime(pull["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                    createdAt = datetime.strptime(pull["createdAt"], GHtimestring)
                     if createdAt > lastcheck:
                         if not self.bot.ponged:
                             await channel.send(f"<@&{self.role}> New pr(s) detected!")
@@ -351,7 +367,7 @@ class Loop(commands.Cog):
 
                     if self.Climit > 0:
                         for comment in pull["comments"]["nodes"]:
-                            CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
                                 await self.send_embed(channel,
                                                       f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
@@ -366,7 +382,7 @@ class Loop(commands.Cog):
 
                     if self.RVlimit > 0:
                         for review in pull["reviews"]["nodes"]:
-                            RcreatedAt = datetime.strptime(review["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            RcreatedAt = datetime.strptime(review["createdAt"], GHtimestring)
                             if RcreatedAt > lastcheck and review['body']:
                                 # the way reviews work is completely insane
                                 # github is fantastic and creates a new review with no body for *any* review comment
@@ -384,7 +400,7 @@ class Loop(commands.Cog):
 
                             if self.Climit > 0:
                                 for comment in review['comments']["nodes"]:
-                                    CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                                    CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                                     if CcreatedAt > lastcheck:
                                         embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
                                         embed.url = comment["url"]
@@ -400,10 +416,32 @@ class Loop(commands.Cog):
 
                                         await channel.send(embed=embed)
 
+                    if self.PClimit > 0:
+                        for commit in pull["commits"]["nodes"]:
+                            commit = commit["commit"]  # yes really
+                            CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
+                            if CcreatedAt > lastcheck:
+                                if not self.bot.ponged:
+                                    await channel.send(f"<@&{self.role}> New commit detected!")
+                                    self.bot.ponged = True
+
+                                author = commit["author"]["user"]
+
+                                await self.send_embed(channel,
+                                                      f"{repoName}: {commit['oid']} on #{pull['number']}",
+                                                      commit['url'],
+                                                      commit['message'],
+                                                      "Committed on: ",
+                                                      CcreatedAt,
+                                                      commit["author"]["name"] if author is None else author["login"],
+                                                      "" if author is None else author["url"],
+                                                      commit["author"]["avatarUrl"],
+                                                      i)
+
                     if pull["closed"]:
-                        closedAt = datetime.strptime(pull["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        closedAt = datetime.strptime(pull["closedAt"], GHtimestring)
                         if pull["merged"]:
-                            mergedAt = datetime.strptime(pull["mergedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            mergedAt = datetime.strptime(pull["mergedAt"], GHtimestring)
                             if mergedAt > lastcheck:
                                 await channel.send(
                                     f"{repoName} - {pull['title']} (#{pull['number']}) merged at {mergedAt} by {pull['mergedBy']['login']}")
@@ -415,7 +453,7 @@ class Loop(commands.Cog):
                     self.bot.log(f"Checking issues for {repoName}")
                     issues = result["repository"]["issues"]["nodes"]
                 for issue in issues:
-                    createdAt = datetime.strptime(issue["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                    createdAt = datetime.strptime(issue["createdAt"], GHtimestring)
                     if createdAt > lastcheck:
                         if not self.bot.ponged:
                             await channel.send(f"<@&{self.role}> New issue(s) detected!")
@@ -434,7 +472,7 @@ class Loop(commands.Cog):
                     # me when i
                     if self.Climit > 0:  # when i duplicated code fragment (14 lines long)
                         for comment in issue["comments"]["nodes"]:
-                            CcreatedAt = datetime.strptime(comment["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+                            CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
                                 await self.send_embed(channel,
                                                       f"{repoName} - New comment on {issue['title']} (#{issue['number']})",
@@ -448,7 +486,7 @@ class Loop(commands.Cog):
                                                       i)
 
                     if issue["closed"]:
-                        closedAt = datetime.strptime(issue["closedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        closedAt = datetime.strptime(issue["closedAt"], GHtimestring)
                         if closedAt > lastcheck:
                             await channel.send(f"{repoName} - {issue['title']} (#{issue['number']}) closed at {closedAt}")
 
@@ -457,7 +495,7 @@ class Loop(commands.Cog):
                     self.bot.log(f"Checking releases for {repoName}")
                     releases = result["repository"]["releases"]["nodes"]
                 for release in releases:
-                        publishedAt = datetime.strptime(release["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                        publishedAt = datetime.strptime(release["publishedAt"], GHtimestring)
                         if publishedAt > lastcheck:
                             if not self.bot.ponged:
                                 await channel.send(f"<@&{self.role}> New release detected!")
