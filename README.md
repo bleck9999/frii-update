@@ -13,12 +13,12 @@ channel: a discord.py channel object fetched from the ID in `frii_update.ini`.
 It's encouraged to use FriiUpdate's staticmethod `log(text)` over your own print statements where possible.
 
 ## Configuration
-###[Modules]
+### [Modules]
 Structure: `name_of_module = true/false`  
 When loading a module, the bot tries to read an entry with the name of the module 
 (so if the module is `cogs/memes.py`, it will look for `memes`). If this option is set to
 `True` (case insensitive), the module will be loaded. 
-###[Config]
+### [Config]
 |Option |Type |Purpose |
 --- | --- | ---
 Role ID | `Int` | The discord ID of the role to ping for alerts (required)
