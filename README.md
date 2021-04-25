@@ -24,8 +24,9 @@ When loading a module, the bot tries to read an entry with the name of the modul
 Role ID | `Int` | The discord ID of the role to ping for alerts (required)
 Channel ID | `Int` | The discord ID of the channel to send messages to (required)
 Pull limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
+Commit limit | `Int` | The maximum number of commits to fetch. Only used with pull requests. Set to 0 to disable.
 Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable. Due to how reviews work setting this to zero is not recommended when review limit > 0.
-Review limit | `Int` | The maximum number of reviews to fetch. Requires pull limit to be > 0. Set to 0 to disable.
+Review limit | `Int` | The maximum number of reviews to fetch. Only used with pull requests. Set to 0 to disable.
 Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.
 Issue limit | `Int` | The maximum number of issues to fetch. Set to 0 to disable.
 Interval | `Int` | The amount of time to wait (in seconds) before each check
