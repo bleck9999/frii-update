@@ -417,7 +417,9 @@ class Loop(commands.Cog):
 
                                         await channel.send(embed=embed)
 
-                    if self.PClimit > 0 and pull["headRepository"]["isFork"]:
+                    if pull["headRepository"] is None:
+                        pass
+                    elif self.PClimit > 0 and pull["headRepository"]["isFork"]:
                         for commit in pull["commits"]["nodes"]:
                             commit = commit["commit"]  # yes really
                             CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
