@@ -264,7 +264,8 @@ class Loop(commands.Cog):
                                   oid
                                   url
                                 }
-                              }}""" if self.PClimit > 0 else '') + ("""
+                              }}
+                              headRepository {isFork}""" if self.PClimit > 0 else '') + ("""
                               reviews (last: $RVlimit){ nodes {
                                 author {
                                   avatarUrl
@@ -416,7 +417,7 @@ class Loop(commands.Cog):
 
                                         await channel.send(embed=embed)
 
-                    if self.PClimit > 0:
+                    if self.PClimit > 0 and pull["headRepository"]["isFork"]:
                         for commit in pull["commits"]["nodes"]:
                             commit = commit["commit"]  # yes really
                             CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
