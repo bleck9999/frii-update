@@ -366,6 +366,30 @@ class Loop(commands.Cog):
                                               pull["author"]["avatarUrl"],
                                               i)
 
+                    if pull["headRepository"] is None:
+                        pass
+                    elif self.PClimit > 0 and pull["headRepository"]["isFork"]:
+                        for commit in pull["commits"]["nodes"]:
+                            commit = commit["commit"]  # yes really
+                            CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
+                            if CcreatedAt > lastcheck:
+                                if not self.bot.ponged:
+                                    await channel.send(f"<@&{self.role}> New commit detected!")
+                                    self.bot.ponged = True
+
+                                author = commit["author"]["user"]
+
+                                await self.send_embed(channel,
+                                                      f"{repoName}: {commit['oid']} on #{pull['number']}",
+                                                      commit['url'],
+                                                      commit['message'],
+                                                      "Committed on: ",
+                                                      CcreatedAt,
+                                                      commit["author"]["name"] if author is None else author["login"],
+                                                      "" if author is None else author["url"],
+                                                      commit["author"]["avatarUrl"],
+                                                      i)
+
                     if self.Climit > 0:
                         for comment in pull["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
@@ -416,30 +440,6 @@ class Loop(commands.Cog):
                                             embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
 
                                         await channel.send(embed=embed)
-
-                    if pull["headRepository"] is None:
-                        pass
-                    elif self.PClimit > 0 and pull["headRepository"]["isFork"]:
-                        for commit in pull["commits"]["nodes"]:
-                            commit = commit["commit"]  # yes really
-                            CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
-                            if CcreatedAt > lastcheck:
-                                if not self.bot.ponged:
-                                    await channel.send(f"<@&{self.role}> New commit detected!")
-                                    self.bot.ponged = True
-
-                                author = commit["author"]["user"]
-
-                                await self.send_embed(channel,
-                                                      f"{repoName}: {commit['oid']} on #{pull['number']}",
-                                                      commit['url'],
-                                                      commit['message'],
-                                                      "Committed on: ",
-                                                      CcreatedAt,
-                                                      commit["author"]["name"] if author is None else author["login"],
-                                                      "" if author is None else author["url"],
-                                                      commit["author"]["avatarUrl"],
-                                                      i)
 
                     if pull["closed"]:
                         closedAt = datetime.strptime(pull["closedAt"], GHtimestring)
