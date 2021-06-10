@@ -65,7 +65,6 @@ class Loop(commands.Cog):
         async with Client(transport=transport, fetch_schema_from_transport=True) as session:
             for i in range(len(self.repos)):
                 repo = git.Repo(self.repos[i][0])
-                # NEW_COMMITS = {}
                 origin = repo.remotes["origin"]
 
                 branches = [branch.name for branch in repo.branches]
@@ -182,7 +181,7 @@ class Loop(commands.Cog):
                         commit = Clist[index]
                         author = res[index]["node"]["author"]
 
-                        if author["user"] is None: # fukin edge cases reeeee
+                        if author["user"] is None:  # fukin edge cases reeeee
                             login = commit.author.name
                             authorUrl = "null"
                         else:
@@ -211,7 +210,7 @@ class Loop(commands.Cog):
                     if self.Climit == 0 and self.RVlimit > 0:
                         self.bot.log("Warning: Comment limit set to 0 but Review limit > 0, this may cause unintended behaviour")
                     if self.Plimit == 0 and self.RVlimit > 0:
-                        self.bot.log(f"Ignoring Review limit of {self.RVlimit} since Pull request limit is 0")
+                        self.bot.log(f"Ignoring Review limit of {self.RVlimit} since pull request limit is 0")
                         self.RVlimit = 0
 
                     # i wouldnt have to do any of this
@@ -348,6 +347,7 @@ class Loop(commands.Cog):
                     self.bot.log(f"Checking prs for {repoName}")
                     pulls = result["repository"]["pullRequests"]["nodes"]
                 for pull in pulls:
+                    changes = {}
                     createdAt = datetime.strptime(pull["createdAt"], GHtimestring)
                     if createdAt > lastcheck:
                         if not self.bot.ponged:
@@ -373,37 +373,13 @@ class Loop(commands.Cog):
                             commit = commit["commit"]  # yes really
                             CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
                             if CcreatedAt > lastcheck:
-                                if not self.bot.ponged:
-                                    await channel.send(f"<@&{self.role}> New commit detected!")
-                                    self.bot.ponged = True
-
-                                author = commit["author"]["user"]
-
-                                await self.send_embed(channel,
-                                                      f"{repoName}: {commit['oid']} on #{pull['number']}",
-                                                      commit['url'],
-                                                      commit['message'],
-                                                      "Committed on: ",
-                                                      CcreatedAt,
-                                                      commit["author"]["name"] if author is None else author["login"],
-                                                      "" if author is None else author["url"],
-                                                      commit["author"]["avatarUrl"],
-                                                      i)
+                                changes[CcreatedAt] = "commit", commit
 
                     if self.Climit > 0:
                         for comment in pull["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
-                                await self.send_embed(channel,
-                                                      f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
-                                                      comment["url"],
-                                                      comment["body"],
-                                                      "Commented on: ",
-                                                      CcreatedAt,
-                                                      comment["author"]["login"],
-                                                      comment["author"]["url"],
-                                                      comment["author"]["avatarUrl"],
-                                                      i)
+                                changes[CcreatedAt] = "comment", comment
 
                     if self.RVlimit > 0:
                         for review in pull["reviews"]["nodes"]:
@@ -412,34 +388,75 @@ class Loop(commands.Cog):
                                 # the way reviews work is completely insane
                                 # github is fantastic and creates a new review with no body for *any* review comment
                                 # there's no point sending this every time that happens.
-                                await self.send_embed(channel,
-                                                      f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
-                                                      review['url'],
-                                                      review['body'],
-                                                      "Submitted on: ",
-                                                      RcreatedAt,
-                                                      review['author']['login'],
-                                                      review['author']['url'],
-                                                      review['author']['avatarUrl'],
-                                                      i)
+                                changes[RcreatedAt] = "review", review
 
                             if self.Climit > 0:
                                 for comment in review['comments']["nodes"]:
                                     CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                                     if CcreatedAt > lastcheck:
-                                        embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
-                                        embed.url = comment["url"]
-                                        embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
-                                        if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
-                                            embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
-                                        else:
-                                            embed.insert_field_at(0, name="Comment", value=comment['body'])
-                                        if len(comment['diffHunk']) > 1020:
-                                            self.bot.log(f"Diff not shown for review comment {comment['id']}")
-                                        else:
-                                            embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+                                        changes[CcreatedAt] = "review comment", comment
 
-                                        await channel.send(embed=embed)
+                    for change in sorted(changes.keys()):
+                        if changes[change][0] == "commit":
+                            commit = changes[change][1]
+                            if not self.bot.ponged:
+                                await channel.send(f"<@&{self.role}> New commit detected!")
+                                self.bot.ponged = True
+
+                            author = commit["author"]["user"]
+
+                            await self.send_embed(channel,
+                                                  f"{repoName}: {commit['oid']} on #{pull['number']}",
+                                                  commit['url'],
+                                                  commit['message'],
+                                                  "Committed on: ",
+                                                  CcreatedAt,
+                                                  commit["author"]["name"] if author is None else author["login"],
+                                                  "" if author is None else author["url"],
+                                                  commit["author"]["avatarUrl"],
+                                                  i)
+
+                        elif changes[change][0] == "comment":
+                            comment = changes[change][1]
+                            await self.send_embed(channel,
+                                                  f"{repoName} - New comment on {pull['title']} (#{pull['number']})",
+                                                  comment["url"],
+                                                  comment["body"],
+                                                  "Commented on: ",
+                                                  CcreatedAt,
+                                                  comment["author"]["login"],
+                                                  comment["author"]["url"],
+                                                  comment["author"]["avatarUrl"],
+                                                  i)
+
+                        elif changes[change][0] == "review":
+                            review = changes[change][1]
+                            await self.send_embed(channel,
+                                                  f"{repoName} - {reviewStates[review['state']]} {pull['title']} (#{pull['number']}) {'[PENDING]' if review['state'] == 'PENDING' else ''}",
+                                                  review['url'],
+                                                  review['body'],
+                                                  "Submitted on: ",
+                                                  RcreatedAt,
+                                                  review['author']['login'],
+                                                  review['author']['url'],
+                                                  review['author']['avatarUrl'],
+                                                  i)
+
+                        elif changes[change][0] == "review comment":
+                            comment = changes[change][1]
+                            embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
+                            embed.url = comment["url"]
+                            embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
+                            if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
+                                embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
+                            else:
+                                embed.insert_field_at(0, name="Comment", value=comment['body'])
+                            if len(comment['diffHunk']) > 1014:
+                                self.bot.log(f"Diff not shown for review comment {comment['id']}")
+                            else:
+                                embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+
+                            await channel.send(embed=embed)
 
                     if pull["closed"]:
                         closedAt = datetime.strptime(pull["closedAt"], GHtimestring)
