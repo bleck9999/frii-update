@@ -19,18 +19,20 @@ When loading a module, the bot tries to read an entry with the name of the modul
 (so if the module is `cogs/memes.py`, it will look for `memes`). If this option is set to
 `True` (case insensitive), the module will be loaded. 
 ### [Config]
-|Option |Type |Purpose |
---- | --- | ---
-Role ID | `Int` | The discord ID of the role to ping for alerts (required)
-Channel ID | `Int` | The discord ID of the channel to send messages to (required)
-Pull limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.
-Commit limit | `Int` | The maximum number of commits to fetch. Only used with pull requests comparing across forks. Set to 0 to disable.
-Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable. Due to how reviews work setting this to zero is not recommended when review limit > 0.
-Review limit | `Int` | The maximum number of reviews to fetch. Only used with pull requests. Set to 0 to disable.
-Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.
-Issue limit | `Int` | The maximum number of issues to fetch. Set to 0 to disable.
-Interval | `Int` | The amount of time to wait (in seconds) before each check
+| Option        | Type  | Purpose                                                                                                                                                   |
+|---------------|-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Role ID       | `Int` | The discord ID of the role to ping for alerts (required)                                                                                                  |
+| Channel ID    | `Int` | The discord ID of the channel to send messages to (required)                                                                                              |
+| Pull limit    | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.                                                                                        |
+| Commit limit  | `Int` | The maximum number of commits to fetch. Only used with pull requests comparing across forks. Set to 0 to disable.                                         |
+| Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable. Due to how reviews work setting this to zero is not recommended when review limit > 0. |
+| Review limit  | `Int` | The maximum number of reviews to fetch. Only used with pull requests. Set to 0 to disable.                                                                |
+| Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.                                                                                             |
+| Issue limit   | `Int` | The maximum number of issues to fetch. Set to 0 to disable.                                                                                               |
+| Interval      | `Int` | The amount of time to wait (in seconds) before each check                                                                                                 |
 
 After one complete cycle, a new entry will be added named `Last Checked`.
 This is not meant to be edited under normal circumstances, but I can't stop you from doing so if you wish.
 It stores the last time the bot checked in the strftime format `%H%M%S %d%m%Y`.
+
+Some modules use additional configuration keys. In this case, documentation is not my job lmao check readmes or the module's docstring
