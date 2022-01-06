@@ -52,7 +52,7 @@ cogs = []
 for cog in os.listdir("cogs"):
     cog = cog.split('.')[0]
     if os.path.isfile(f"cogs/{cog}.py"):
-        if config["Modules"][cog].lower() == "true":
+        if cog in config["Modules"] and config["Modules"][cog].lower() == "true":
             FriiUpdate.log(f"Loading {cog}.py")
             cogs.append(cog)
 
