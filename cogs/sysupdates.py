@@ -19,14 +19,14 @@ class Loop(commands.Cog):
 
         feed = feedparser.parse("https://yls8.mtheall.com/ninupdates/feed.php")
         for entry in feed.entries:
-            if "3DS" in entry.title or "WiiU" in entry.title:
+            if "3DS" in entry.title or "WiiU" in entry.title:  # bad console alert
                 continue
             version = entry.title[7:]
             if version not in entries:
                 if not self.bot.ponged:
                     await channel.send(f"<@&{roleid}> New firmware version detected!")
                     self.bot.ponged = True
-                await channel.send(f"Version {version} released on: {entry.published}")
+                await channel.send(f"New version {version} released on: {entry.published}")
                 entries.append(version)
 
         with open("info.json", "w") as j:
