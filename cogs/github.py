@@ -281,6 +281,7 @@ class Loop(commands.Cog):
                                   createdAt
                                   diffHunk
                                   id
+                                  outdated
                                   url
                                 }}""" if self.RVlimit > 0 and self.Climit > 0 else '') + ("""
                                 body
@@ -447,14 +448,15 @@ class Loop(commands.Cog):
                             embed = discord.Embed(title=f"{repoName} - New review comment on {pull['title']} (#{pull['number']})")
                             embed.url = comment["url"]
                             embed.set_author(name=comment['author']['login'], url=comment['author']['url'], icon_url=comment['author']['avatarUrl'])
-                            if len(comment['body']) > 1020: #limit for embed fields is 1024 chars
+                            if len(comment['body']) > 1020:  # limit for embed fields is 1024 chars
                                 embed.insert_field_at(0, name="Comment", value=f"{comment['body'][:1020]} ...")
                             else:
                                 embed.insert_field_at(0, name="Comment", value=comment['body'])
                             if len(comment['diffHunk']) > 1014:
                                 self.bot.log(f"Diff not shown for review comment {comment['id']}")
                             else:
-                                embed.insert_field_at(1, name="Diff", value=f"```diff\n{comment['diffHunk']}```")
+                                embed.insert_field_at(1, name=f"Diff {'(outdated)' if comment['outdated'] else ''}",
+                                                      value=f"```diff\n{comment['diffHunk']}```")
 
                             await channel.send(embed=embed)
 
