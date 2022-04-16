@@ -9,8 +9,8 @@ import io
 
 class Loop(commands.Cog):
     """Uses testmail api (https://testmail.app/)
-    Expects a token in frii_update.ini under `Tokens` with the name `Testmail`
-    and a `TM_Namespace` under `Config`"""
+    Expects a comma seperated list `TM_Namespaces` under `Config`
+    and token in frii_update.ini for each namespace under `Tokens` with the name `Testmail.<namespace>`"""
     def __init__(self, bot):
         self.bot = bot
         self.conf = configparser.ConfigParser()
@@ -26,7 +26,14 @@ class Loop(commands.Cog):
                               to
                             }
                           }
-                        }""".replace("NM_REPLACE", self.conf["Config"]["TM_Namespace"])
+                        }"""
+
+        if "TM_Namespace" in self.conf["Config"]:  # compatibility
+            self.namespaces = [self.conf["Config"]["TM_Namespace"].strip()]
+        else:
+            self.namespaces = self.conf["Config"]["TM_Namespaces"].split(sep=',')
+            self.namespaces = [x.strip() for x in self.namespaces]
+
         try:
             getattr(self.bot, "emails")
         except AttributeError:
@@ -35,23 +42,28 @@ class Loop(commands.Cog):
         # but emails get nuked after 24 hours with free tier anyway so it's not a big deal
 
     async def main(self, channel):
-        headers = {"Authorization": f"Bearer {self.conf['Tokens']['Testmail']}"}
-        transport = AIOHTTPTransport(url="https://api.testmail.app/api/graphql", headers=headers)
-        async with Client(transport=transport, fetch_schema_from_transport=True) as session:
-            self.bot.log("Checking testmail")
-            result = await session.execute(gql(self.req))
-            for email in result["inbox"]["emails"]:
-                if email not in self.emails:
-                    embed = discord.Embed()
-                    embed.set_author(name=f"From: {email['from']}\nTo: {email['to']}\nSubject: {email['subject']}")
-                    embed.description = email['text'][:2047]
-                    await channel.send(embed=embed)
-                    self.emails.append(email)
-                    # reee why cant i give a string and have discord.File do it for me
-                    sio = io.StringIO(email["html"])
-                    bio = io.BytesIO(sio.read().encode('utf8'))
-                    htmlfile = discord.File(bio, filename="email.html")
-                    await channel.send(file=htmlfile)
+        for namespace in self.namespaces:
+            if len(self.namespaces) == 1:  # compatibility (part 2)
+                headers = {"Authorization": f"Bearer {self.conf['Tokens']['Testmail']}"}
+            else:
+                headers = {"Authorization": f"Bearer {self.conf['Tokens'][f'Testmail.{namespace}']}"}
+
+            transport = AIOHTTPTransport(url="https://api.testmail.app/api/graphql", headers=headers)
+            async with Client(transport=transport, fetch_schema_from_transport=True) as session:
+                self.bot.log(f"Checking testmail namespace {namespace}")
+                result = await session.execute(gql(self.req.replace("NM_REPLACE", namespace)))
+                for email in result["inbox"]["emails"]:
+                    if email not in self.emails:
+                        embed = discord.Embed()
+                        embed.set_author(name=f"From: {email['from']}\nTo: {email['to']}\nSubject: {email['subject']}")
+                        embed.description = email['text'][:2047]
+                        await channel.send(embed=embed)
+                        self.emails.append(email)
+                        # reee why cant i give a string and have discord.File do it for me
+                        sio = io.StringIO(email["html"])
+                        bio = io.BytesIO(sio.read().encode('utf8'))
+                        htmlfile = discord.File(bio, filename="email.html")
+                        await channel.send(file=htmlfile)
 
     @commands.command()
     async def checkmail(self, ctx):
