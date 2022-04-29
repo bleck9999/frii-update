@@ -527,6 +527,68 @@ class Loop(commands.Cog):
                                                   release["author"]["avatarUrl"],
                                                   i)
 
+    @commands.command()
+    async def status(self, ctx, repo):
+        """Displays open issues/pull requests for the given repo
+        Usage: `.status <repo (username/reponame)>`"""
+        owner, name = repo.split(sep='/')
+        using = []
+        for k in ["pull", "issue"]:
+            if self.limits[k] > 0:
+                using.append(f"${k}:Int!")
+        req = """
+        query ($owner:String!, $repo_name:String!,""" + ",".join(using) + "){" + """
+            repository(owner:$owner, name:$repo_name){""" + ("""
+              pullRequests(last:$pull, states:OPEN){nodes {
+                author {login}
+                number
+                title
+                url
+              }}""" if self.limits["pull"] > 0 else '') + ("""
+              issues (last: $issue, states:OPEN){ nodes {
+                author {login}
+                number
+                title
+                url
+              }}""" if self.limits["issue"] > 0 else '') + """
+            }
+        }"""
+        params = {"owner": owner,
+                  "repo_name": name}
+        for x in using:
+            x = x.split(sep=':')[0][1:]
+            params[x] = self.limits[x]
+
+        headers = {"Authorization": f"Bearer {self.conf['Tokens']['github']}"}
+        transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
+        async with Client(transport=transport, fetch_schema_from_transport=True) as session:
+            res = await session.execute(gql(req), variable_values=params)
+
+        if self.limits["pull"] > 0:
+            pulls = res["repository"]["pullRequests"]["nodes"]
+            desc = ""
+            for pull in pulls:
+                desc += f'#{pull["number"]}: [{pull["title"]}]({pull["url"]}) by {pull["author"]["login"]}\n'
+            if not desc:
+                await ctx.send("No open PRs at this time")
+            else:
+                embed = discord.Embed()
+                embed.title = f"Open PRs for {repo} (max {self.limits['pull']} displayed)"
+                embed.description = desc
+                await ctx.send(embed=embed)
+        if self.limits["issue"] > 0:
+            issues = res["repository"]["issues"]["nodes"]
+            desc = ""
+            for issue in issues:
+                desc += f'#{issue["number"]}: [{issue["title"]}]({issue["url"]}) by {issue["author"]["login"]}\n'
+            if not desc:
+                await ctx.send("No open issues at this time")
+            else:
+                embed = discord.Embed()
+                embed.title = f"Open issues for {repo} (max {self.limits['issue']} displayed)"
+                embed.description = desc
+                await ctx.send(embed=embed)
+
 
 def setup(bot):
     bot.add_cog(Loop(bot))
