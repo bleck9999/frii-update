@@ -20,12 +20,10 @@ class Loop(commands.Cog):
         self.bot = bot
         self.channel = int(self.conf["Config"]["Channel ID"])
         self.role = int(self.conf["Config"]["Role ID"])
-        self.Plimit = int(self.conf["Config"]["Pull limit"])
-        self.Climit = int(self.conf["Config"]["Comment limit"])
-        self.RVlimit = int(self.conf["Config"]["Review limit"])
-        self.RLlimit = int(self.conf["Config"]["Release limit"])
-        self.Ilimit = int(self.conf["Config"]["Issue limit"])
-        self.PClimit = int(self.conf["Config"]["Commit limit"])
+        self.limits = {}
+        for k in self.conf["Config"]:
+            if "limit" in k.lower():
+                self.limits[k.lower().split(sep=' ')[0]] = int(self.conf["Config"][k])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -205,24 +203,18 @@ class Loop(commands.Cog):
                                               author["avatarUrl"],
                                               i)
 
-                if self.Plimit + self.RVlimit + self.RLlimit + self.Ilimit > 0:
+                if self.limits["pull"] or self.limits["review"] or self.limits["release"] or self.limits["issue"]:
                     self.bot.log(f"Fetching GitHub information for {repoName}")
-                    if self.Climit == 0 and self.RVlimit > 0:
+                    if self.limits["comment"] == 0 and self.limits["review"] > 0:
                         self.bot.log("Warning: Comment limit set to 0 but Review limit > 0, this may cause unintended behaviour")
-                    if self.Plimit == 0 and self.RVlimit > 0:
-                        self.bot.log(f"Ignoring Review limit of {self.RVlimit} since pull request limit is 0")
-                        self.RVlimit = 0
+                    if self.limits["pull"] == 0 and self.limits["review"] > 0:
+                        self.bot.log(f"Ignoring Review limit of {self.limits['review']} since pull request limit is 0")
+                        self.limits["review"] = 0
 
-                    # i wouldnt have to do any of this
-                    # but no graphql decided that an unused variable is an error
-                    # always, no way to turn it off
-                    # fucks sake
-                    args = ["$Plimit:Int!", "$Climit:Int!", "$RVlimit:Int!",
-                            "$RLlimit:Int!", "$Ilimit:Int!", "$PClimit:Int!"]
                     using = []
-                    for x in args:
-                        if eval(f"self.{x.split(sep=':')[0][1:]}") > 0:  # look i know
-                            using.append(x)                              # no excuses anymore
+                    for limit in self.limits:
+                        if self.limits[limit] > 0:
+                            using.append(f"${limit}:Int!")
 
                     # right what's about to happen probably needs some explanation
                     # i dont want to copy the same massive fuck off string for every configuration you could have
@@ -231,7 +223,7 @@ class Loop(commands.Cog):
                     query ($owner:String!,
                         $repo_name:String!,""" + ",".join(using) + "){" + """
                         repository(owner:$owner, name:$repo_name){""" + ("""
-                          pullRequests(last:$Plimit){
+                          pullRequests(last:$pull){
                             nodes {
                               author {
                                 avatarUrl
@@ -240,8 +232,8 @@ class Loop(commands.Cog):
                               }
                               body
                               closed
-                              closedAt""" if self.Plimit > 0 else '') + ("""
-                              comments (last: $Climit){ nodes {
+                              closedAt""" if self.limits["pull"] > 0 else '') + ("""
+                              comments (last: $comment){ nodes {
                                 author {
                                   avatarUrl
                                   login
@@ -250,8 +242,8 @@ class Loop(commands.Cog):
                                 body
                                 createdAt
                                 url
-                              }}""" if self.Climit > 0 and self.Plimit > 0 else '') + ("""
-                              commits (last: $PClimit){ nodes {
+                              }}""" if self.limits["comment"] > 0 and self.limits["pull"] > 0 else '') + ("""
+                              commits (last: $commit){ nodes {
                                 commit {
                                   committedDate
                                   author {
@@ -264,14 +256,14 @@ class Loop(commands.Cog):
                                   url
                                 }
                               }}
-                              headRepository {isFork}""" if self.PClimit > 0 else '') + ("""
-                              reviews (last: $RVlimit){ nodes {
+                              headRepository {isFork}""" if self.limits["commit"] > 0 else '') + ("""
+                              reviews (last: $review){ nodes {
                                 author {
                                   avatarUrl
                                   login
                                   url
-                                }""" if self.RVlimit > 0 else '') + ("""
-                                comments (last: $Climit){ nodes {
+                                }""" if self.limits["review"] > 0 else '') + ("""
+                                comments (last: $comment){ nodes {
                                   author {
                                     avatarUrl
                                     login
@@ -283,12 +275,12 @@ class Loop(commands.Cog):
                                   id
                                   outdated
                                   url
-                                }}""" if self.RVlimit > 0 and self.Climit > 0 else '') + ("""
+                                }}""" if self.limits["review"] > 0 and self.limits["comment"] > 0 else '') + ("""
                                 body
                                 createdAt
                                 state
                                 url
-                              }}""" if self.RVlimit > 0 else '') + ("""
+                              }}""" if self.limits["review"] > 0 else '') + ("""
                               createdAt
                               isDraft
                               merged
@@ -298,8 +290,8 @@ class Loop(commands.Cog):
                               title
                               url
                             }
-                          }""" if self.Plimit > 0 else '') + ("""
-                          releases (last: $RLlimit){ nodes {
+                          }""" if self.limits["pull"] > 0 else '') + ("""
+                          releases (last: $release){ nodes {
                             author { 
                               login
                               url
@@ -310,8 +302,8 @@ class Loop(commands.Cog):
                             name
                             publishedAt
                             url
-                          }}""" if self.RLlimit > 0 else '') + ("""
-                          issues (last: $Ilimit){ nodes {
+                          }}""" if self.limits["release"] > 0 else '') + ("""
+                          issues (last: $issue){ nodes {
                             author {
                               login
                               url
@@ -319,8 +311,8 @@ class Loop(commands.Cog):
                             }
                             body
                             closed
-                            closedAt""" if self.Ilimit > 0 else '') + ("""
-                            comments (last: $Climit) { nodes {
+                            closedAt""" if self.limits["issue"] > 0 else '') + ("""
+                            comments (last: $comment) { nodes {
                               author {
                                 avatarUrl
                                 login
@@ -329,22 +321,24 @@ class Loop(commands.Cog):
                               body
                               createdAt
                               url
-                            }}""" if self.Climit > 0 and self.Ilimit > 0 else '') + ("""
+                            }}""" if self.limits["comment"] > 0 and self.limits["issue"] > 0 else '') + ("""
                             createdAt
                             number
                             title
                             url
-                          }}""" if self.Ilimit > 0 else '') + """
+                          }}""" if self.limits["issue"] > 0 else '') + """
                         }
-                    }"""                                                        # graphQL was a mistake
+                    }"""                                                        
+                    # graphQL was a mistake
                     params = {"owner": repoAuthor,
                               "repo_name": repoName}
                     for x in using:
-                        params[x.split(sep=':')[0][1:]] = eval(f"self.{x.split(sep=':')[0][1:]}")
+                        x = x.split(sep=':')[0][1:]
+                        params[x] = self.limits[x]
                     result = await session.execute(gql(req), variable_values=params)
 
                 pulls = []
-                if self.Plimit > 0:
+                if self.limits["pull"] > 0:
                     self.bot.log(f"Checking prs for {repoName}")
                     pulls = result["repository"]["pullRequests"]["nodes"]
                 for pull in pulls:
@@ -369,20 +363,20 @@ class Loop(commands.Cog):
 
                     if pull["headRepository"] is None:
                         pass
-                    elif self.PClimit > 0 and pull["headRepository"]["isFork"]:
+                    elif self.limits["commit"] > 0 and pull["headRepository"]["isFork"]:
                         for commit in pull["commits"]["nodes"]:
                             commit = commit["commit"]  # yes really
                             CcreatedAt = datetime.strptime(commit["committedDate"], GHtimestring)
                             if CcreatedAt > lastcheck:
                                 changes[CcreatedAt] = "commit", commit
 
-                    if self.Climit > 0:
+                    if self.limits["comment"] > 0:
                         for comment in pull["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
                                 changes[CcreatedAt] = "comment", comment
 
-                    if self.RVlimit > 0:
+                    if self.limits["review"] > 0:
                         for review in pull["reviews"]["nodes"]:
                             RcreatedAt = datetime.strptime(review["createdAt"], GHtimestring)
                             if RcreatedAt > lastcheck and review['body']:
@@ -391,7 +385,7 @@ class Loop(commands.Cog):
                                 # there's no point sending this every time that happens.
                                 changes[RcreatedAt] = "review", review
 
-                            if self.Climit > 0:
+                            if self.limits["comment"] > 0:
                                 for comment in review['comments']["nodes"]:
                                     CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                                     if CcreatedAt > lastcheck:
@@ -471,7 +465,7 @@ class Loop(commands.Cog):
                             await channel.send(f"{repoName} - {pull['title']} (#{pull['number']}) closed at {closedAt}")
 
                 issues = []
-                if self.Ilimit > 0:
+                if self.limits["issue"] > 0:
                     self.bot.log(f"Checking issues for {repoName}")
                     issues = result["repository"]["issues"]["nodes"]
                 for issue in issues:
@@ -492,7 +486,7 @@ class Loop(commands.Cog):
                                               issue["author"]["avatarUrl"],
                                               i)
                     # me when i
-                    if self.Climit > 0:  # when i duplicated code fragment (14 lines long)
+                    if self.limits["comment"] > 0:  # when i duplicated code fragment (14 lines long)
                         for comment in issue["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
@@ -513,7 +507,7 @@ class Loop(commands.Cog):
                             await channel.send(f"{repoName} - {issue['title']} (#{issue['number']}) closed at {closedAt}")
 
                 releases = []
-                if self.RLlimit > 0:
+                if self.limits["release"] > 0:
                     self.bot.log(f"Checking releases for {repoName}")
                     releases = result["repository"]["releases"]["nodes"]
                 for release in releases:
