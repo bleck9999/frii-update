@@ -328,7 +328,7 @@ class Loop(commands.Cog):
                             url
                           }}""" if self.limits["issue"] > 0 else '') + """
                         }
-                    }"""                                                        
+                    }"""
                     # graphQL was a mistake
                     params = {"owner": repoAuthor,
                               "repo_name": repoName}
@@ -361,7 +361,7 @@ class Loop(commands.Cog):
                                               pull["author"]["avatarUrl"],
                                               i)
 
-                    if pull["headRepository"] is None:
+                    if pull["headRepository"] is None:  # according to docs this can be null (because of course)
                         pass
                     elif self.limits["commit"] > 0 and pull["headRepository"]["isFork"]:
                         for commit in pull["commits"]["nodes"]:
@@ -454,14 +454,15 @@ class Loop(commands.Cog):
 
                             await channel.send(embed=embed)
 
-                    if pull["closed"]:
+                    if pull["merged"]:
+                        mergedAt = datetime.strptime(pull["mergedAt"], GHtimestring)
+                        if mergedAt > lastcheck:
+                            await channel.send(
+                                f"{repoName} - {pull['title']} (#{pull['number']}) merged at {mergedAt} by {pull['mergedBy']['login']}")
+                    elif pull["closed"]:
+                        # merged PRs are also marked as closed so elif here ensures this only runs if it's closed and not merged
                         closedAt = datetime.strptime(pull["closedAt"], GHtimestring)
-                        if pull["merged"]:
-                            mergedAt = datetime.strptime(pull["mergedAt"], GHtimestring)
-                            if mergedAt > lastcheck:
-                                await channel.send(
-                                    f"{repoName} - {pull['title']} (#{pull['number']}) merged at {mergedAt} by {pull['mergedBy']['login']}")
-                        elif closedAt > lastcheck:
+                        if closedAt > lastcheck:
                             await channel.send(f"{repoName} - {pull['title']} (#{pull['number']}) closed at {closedAt}")
 
                 issues = []
@@ -485,8 +486,8 @@ class Loop(commands.Cog):
                                               issue["author"]["url"],
                                               issue["author"]["avatarUrl"],
                                               i)
-                    # me when i
-                    if self.limits["comment"] > 0:  # when i duplicated code fragment (14 lines long)
+
+                    if self.limits["comment"] > 0:
                         for comment in issue["comments"]["nodes"]:
                             CcreatedAt = datetime.strptime(comment["createdAt"], GHtimestring)
                             if CcreatedAt > lastcheck:
@@ -511,21 +512,21 @@ class Loop(commands.Cog):
                     self.bot.log(f"Checking releases for {repoName}")
                     releases = result["repository"]["releases"]["nodes"]
                 for release in releases:
-                        publishedAt = datetime.strptime(release["publishedAt"], GHtimestring)
-                        if publishedAt > lastcheck:
-                            if not self.bot.ponged:
-                                await channel.send(f"<@&{self.role}> New release detected!")
-                                self.bot.ponged = True
-                            await self.send_embed(channel,
-                                                  f"{repoName} - {'[PRERELEASE]' if release['isPrerelease'] else ''} Release {release['name']}",
-                                                  release["url"],
-                                                  release["description"],
-                                                  "Published on: ",
-                                                  publishedAt,
-                                                  release["author"]["login"],
-                                                  release["author"]["url"],
-                                                  release["author"]["avatarUrl"],
-                                                  i)
+                    publishedAt = datetime.strptime(release["publishedAt"], GHtimestring)
+                    if publishedAt > lastcheck:
+                        if not self.bot.ponged:
+                            await channel.send(f"<@&{self.role}> New release detected!")
+                            self.bot.ponged = True
+                        await self.send_embed(channel,
+                                              f"{repoName} - {'[PRERELEASE]' if release['isPrerelease'] else ''} Release {release['name']}",
+                                              release["url"],
+                                              release["description"],
+                                              "Published on: ",
+                                              publishedAt,
+                                              release["author"]["login"],
+                                              release["author"]["url"],
+                                              release["author"]["avatarUrl"],
+                                              i)
 
     @commands.command()
     async def status(self, ctx, repo):
@@ -572,10 +573,22 @@ class Loop(commands.Cog):
             if not desc:
                 await ctx.send("No open PRs at this time")
             else:
-                embed = discord.Embed()
-                embed.title = f"Open PRs for {repo} (max {self.limits['pull']} displayed)"
-                embed.description = desc
-                await ctx.send(embed=embed)
+                descriptions = []
+                paged = ""
+                for line in desc.split(sep='\n'):
+                    if len(paged + line) <= 2000:
+                        paged += line + '\n'
+                    else:
+                        descriptions.append(paged)
+                        paged = ''
+                if paged:
+                    descriptions.append(paged)
+                for i, v in enumerate(descriptions):
+                    embed = discord.Embed()
+                    embed.title = '' if i else f"Open PRs for {repo} (max {self.limits['pull']} displayed)"
+                    embed.description = v
+                    await ctx.send(embed=embed)
+
         if self.limits["issue"] > 0:
             issues = res["repository"]["issues"]["nodes"]
             desc = ""
@@ -584,10 +597,21 @@ class Loop(commands.Cog):
             if not desc:
                 await ctx.send("No open issues at this time")
             else:
-                embed = discord.Embed()
-                embed.title = f"Open issues for {repo} (max {self.limits['issue']} displayed)"
-                embed.description = desc
-                await ctx.send(embed=embed)
+                descriptions = []
+                paged = ""
+                for line in desc.split(sep='\n'):
+                    if len(paged + line) <= 2000:
+                        paged += line + '\n'
+                    else:
+                        descriptions.append(paged)
+                        paged = ''
+                if paged:
+                    descriptions.append(paged)
+                for i, v in enumerate(descriptions):
+                    embed = discord.Embed()
+                    embed.title = '' if i else f"Open issues for {repo} (max {self.limits['issue']} displayed)"
+                    embed.description = v
+                    await ctx.send(embed=embed)
 
 
 def setup(bot):
