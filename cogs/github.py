@@ -18,12 +18,11 @@ class Loop(commands.Cog):
         self.conf = configparser.ConfigParser()
         self.conf.read("frii_update.ini")
         self.bot = bot
-        self.channel = int(self.conf["Config"]["Channel ID"])
-        self.role = int(self.conf["Config"]["Role ID"])
+        self.role = int(self.conf["Bot"]["Role ID"])
         self.limits = {}
-        for k in self.conf["Config"]:
+        for k in self.conf["Github"]:
             if "limit" in k.lower():
-                self.limits[k.lower().split(sep=' ')[0]] = int(self.conf["Config"][k])
+                self.limits[k.lower().split(sep=' ')[0]] = int(self.conf["Github"][k])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -58,7 +57,7 @@ class Loop(commands.Cog):
         }
         lastcheck = self.bot.lastcheck
 
-        headers = {"Authorization": f"Bearer {self.conf['Tokens']['github']}"}
+        headers = {"Authorization": f"Bearer {self.conf['Github']['token']}"}
         transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
         async with Client(transport=transport, fetch_schema_from_transport=True) as session:
             for i in range(len(self.repos)):

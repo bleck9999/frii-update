@@ -5,6 +5,7 @@ import importlib
 import inspect
 import os
 
+
 from discord import Intents
 from discord.ext import commands
 from traceback import format_exception
@@ -19,9 +20,9 @@ class FriiUpdate(commands.Bot):
         for cog in cogs:
             self.load_extension("cogs." + cog)
             globals()[cog] = importlib.import_module("cogs." + cog)  # "bad practice"
-        self.role = int(config["Config"]["Role ID"])                 # if it works is it really still stupid?
+        self.role = int(config["Bot"]["Role ID"])                    # if it works is it really still stupid?
         self.lastcheck = datetime.datetime.utcnow()
-        self.interval = int(config["Config"]["Interval"])
+        self.interval = int(config["Bot"]["Interval"])
         self.ponged = False
 
     async def on_ready(self):
@@ -36,7 +37,7 @@ class FriiUpdate(commands.Bot):
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
-        channel = await self.fetch_channel(int(config["Config"]["Channel ID"]))
+        channel = await self.fetch_channel(int(config["Bot"]["Channel ID"]))
         await channel.send(f"<@&{self.role}> an unhandled exception has occurred")
         # by saying this we imply that some errors *are* handled gracefully
         exc = getattr(exception, 'original', exception)
@@ -63,10 +64,10 @@ bot = FriiUpdate(command_prefix=".", intents=intents)
 
 @bot.command()
 async def start(ctx):
-    if "Last checked" in config["Config"].keys():
-        bot.lastcheck = datetime.datetime.strptime(config["Config"]["Last checked"], "%H%M%S %d%m%Y")
+    if "Last checked" in config["Bot"].keys():
+        bot.lastcheck = datetime.datetime.strptime(config["Bot"]["Last checked"], "%H%M%S %d%m%Y")
     await bot.wait_until_ready()
-    channel = await bot.fetch_channel(config["Config"]["Channel ID"])
+    channel = await bot.fetch_channel(config["Bot"]["Channel ID"])
 
     while True:
         bot.ponged = False
@@ -77,7 +78,7 @@ async def start(ctx):
             # that day is not today
 
         bot.lastcheck = datetime.datetime.utcnow()
-        config["Config"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
+        config["Bot"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
         with open("frii_update.ini", "w") as confFile:
             config.write(confFile)
         await asyncio.sleep(bot.interval)
@@ -96,4 +97,4 @@ async def interval(ctx, time):
     await ctx.send(f"Interval set to {time} seconds")
 
 bot.log("Connecting...")
-bot.run(config["Tokens"]["Discord"])
+bot.run(config["Bot"]["Token"])

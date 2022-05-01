@@ -18,20 +18,25 @@ Structure: `name_of_module = true/false`
 When loading a module, the bot tries to read an entry with the name of the module 
 (so if the module is `cogs/memes.py`, it will look for `memes`). If this option is set to
 `True` (case insensitive), the module will be loaded. 
-### [Config]
+### [Bot]
+| Option        | Type  | Purpose                                                                                                                                                  |
+|---------------|-------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Role ID       | `Int` | The discord ID of the role to ping for alerts (required)                                                                                                 |
+| Channel ID    | `Int` | The discord ID of the channel to send messages to (required)                                                                                             |
+| Interval      | `Int` | The amount of time to wait (in seconds) before each check                                                                                                |
+| Token         | `Str` | Discord token. Details on how to create one here: https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token                |
+### [Github]
 | Option        | Type  | Purpose                                                                                                                                                   |
 |---------------|-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Role ID       | `Int` | The discord ID of the role to ping for alerts (required)                                                                                                  |
-| Channel ID    | `Int` | The discord ID of the channel to send messages to (required)                                                                                              |
 | Pull limit    | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable.                                                                                        |
 | Commit limit  | `Int` | The maximum number of commits to fetch. Only used with pull requests comparing across forks. Set to 0 to disable.                                         |
 | Comment limit | `Int` | The maximum number of pull requests to fetch. Set to 0 to disable. Due to how reviews work setting this to zero is not recommended when review limit > 0. |
 | Review limit  | `Int` | The maximum number of reviews to fetch. Only used with pull requests. Set to 0 to disable.                                                                |
 | Release limit | `Int` | The maximum number of releases to fetch. Set to 0 to disable.                                                                                             |
 | Issue limit   | `Int` | The maximum number of issues to fetch. Set to 0 to disable.                                                                                               |
-| Interval      | `Int` | The amount of time to wait (in seconds) before each check                                                                                                 |
+| Token         | `Str` | Github API token. Requires public: repo and read: user scopes. Can be generated here: https://github.com/settings/tokens                                  |
 
-After one complete cycle, a new entry will be added named `Last Checked`.
+After one complete cycle, a new entry will be added under `[Bot]` named `Last Checked`.
 This is not meant to be edited under normal circumstances, but I can't stop you from doing so if you wish.
 It stores the last time the bot checked in the strftime format `%H%M%S %d%m%Y`.
 
