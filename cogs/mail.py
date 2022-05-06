@@ -48,6 +48,7 @@ class Loop(commands.Cog):
         if "Mail.com" in self.conf:
             self.active.append("mail.com")
             self.accounts = {}
+            self.localtz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
             addrs = [x.strip() for x in self.conf["Mail.com"]["addresses"].split(sep=',')]
             # assume nobody has a password that starts or ends with 4 consecutive spaces
             # we dont strip each entry for this reason (above accounts for 1@mail.com,<possible space>2@mail.com
@@ -110,8 +111,8 @@ class Loop(commands.Cog):
                             else:
                                 zpad += f" at{rhs}"
                             break
-                    recvd = datetime.datetime.strptime(zpad, "%A, %B %d, %Y at %I:%M %p")
-                    if recvd > self.bot.lastcheck:
+                    recvd = datetime.datetime.strptime(zpad, "%A, %B %d, %Y at %I:%M %p").replace(tzinfo=self.localtz)
+                    if recvd > self.bot.lastcheck.replace(tzinfo=datetime.timezone.utc):
                         returnaddr = br.geturl()
 
                         messageurl = item.find(class_="message-list__link mail-panel__link")["href"]
