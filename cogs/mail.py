@@ -48,8 +48,9 @@ class Loop(commands.Cog):
         if "Mail.com" in self.conf:
             self.active.append("mail.com")
             self.accounts = {}
-            addrs = self.conf["Mail.com"]["addresses"].split(sep=',')
+            addrs = [x.strip() for x in self.conf["Mail.com"]["addresses"].split(sep=',')]
             # assume nobody has a password that starts or ends with 4 consecutive spaces
+            # we dont strip each entry for this reason (above accounts for 1@mail.com,<possible space>2@mail.com
             pws = self.conf["Mail.com"]["passwords"].split(sep='    ')
             for i in range(len(addrs)):
                 self.accounts[addrs[i].strip()] = pws[i]
