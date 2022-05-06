@@ -114,11 +114,15 @@ class Loop(commands.Cog):
                     if recvd > self.bot.lastcheck:
                         returnaddr = br.geturl()
 
-                        messageurl = item.a["href"]
+                        messageurl = item.find(class_="message-list__link mail-panel__link")["href"]
                         res = br.open(messageurl)
                         message = BeautifulSoup(res.get_data(), "html.parser")
                         subject = message.find(class_="mail-header__subject").text
-                        sender = message.find(class_="mail-header__sender")["title"]
+                        sender = message.find(class_="mail-header__sender")
+                        if "title" in sender:
+                            sender = sender["title"]
+                        else:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
+                            sender = "mail.com Service (service@corp.mail.com)"
 
                         res = br.open(message.find("iframe")["src"])
                         text = BeautifulSoup(res.get_data(), "html.parser").get_text()
