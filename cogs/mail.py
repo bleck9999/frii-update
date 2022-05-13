@@ -1,5 +1,7 @@
 import configparser
 import datetime
+import re
+
 import discord
 import mechanize
 import io
@@ -96,47 +98,36 @@ class Loop(commands.Cog):
             soup = BeautifulSoup(res.get_data(), "html.parser")
             br.open(soup.find_all("meta")[3]["content"][6:])
             br.follow_link(text="Go to mail.com mailbox with limited functionality")
-            link = br.find_link(text="Inbox")
+            link = br.find_link(text_regex=re.compile("Inbox( \d+ unread)?"))
             res = br.open(link.absolute_url)
             soup = BeautifulSoup(res.get_data(), "html.parser")
 
             for item in soup.find_all("li"):
-                if item["class"] == ["message-list__item", "mail-panel"]:
-                    timestring = item.dl.find(class_="mail-header__date")["title"]
-                    zpad = timestring.split(' at')[0]
-                    for i, char in enumerate(rhs := timestring.split(' at')[1]):  # hack to zero-pad the hour
-                        if char.isnumeric():
-                            if rhs[i + 1] == ':':
-                                zpad += f' at 0{rhs[i:].strip()}'
-                            else:
-                                zpad += f" at{rhs}"
-                            break
-                    recvd = datetime.datetime.strptime(zpad, "%A, %B %d, %Y at %I:%M %p").replace(tzinfo=self.localtz)
-                    if recvd > self.bot.lastcheck.replace(tzinfo=datetime.timezone.utc):
-                        returnaddr = br.geturl()
+                if item["class"] == ["message-list__item", "mail-panel", "is-unread"]:
+                    returnaddr = br.geturl()
 
-                        messageurl = item.find(class_="message-list__link mail-panel__link")["href"]
-                        res = br.open(messageurl)
-                        message = BeautifulSoup(res.get_data(), "html.parser")
-                        subject = message.find(class_="mail-header__subject").text
-                        sender = message.find(class_="mail-header__sender")
-                        if "title" in sender:
-                            sender = sender["title"]
-                        else:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
-                            sender = "mail.com Service (service@corp.mail.com)"
+                    messageurl = item.find(class_="message-list__link mail-panel__link")["href"]
+                    res = br.open(messageurl)
+                    message = BeautifulSoup(res.get_data(), "html.parser")
+                    subject = message.find(class_="mail-header__subject").text
+                    sender = message.find(class_="mail-header__sender")
+                    if "title" in sender:
+                        sender = sender["title"]
+                    else:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
+                        sender = "mail.com Service (service@corp.mail.com)"
 
-                        res = br.open(message.find("iframe")["src"])
-                        text = BeautifulSoup(res.get_data(), "html.parser").get_text()
+                    res = br.open(message.find("iframe")["src"])
+                    text = BeautifulSoup(res.get_data(), "html.parser").get_text()
 
-                        embed = discord.Embed()
-                        embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
-                        embed.description = text[:2047]
-                        await channel.send(embed=embed)
+                    embed = discord.Embed()
+                    embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
+                    embed.description = text[:2047]
+                    await channel.send(embed=embed)
 
-                        htmlfile = discord.File(io.BytesIO(res.get_data()), filename="email.html")
-                        await channel.send(file=htmlfile)
+                    htmlfile = discord.File(io.BytesIO(res.get_data()), filename="email.html")
+                    await channel.send(file=htmlfile)
 
-                        br.open(returnaddr)
+                    br.open(returnaddr)
 
     async def main(self, channel):
         if "testmail" in self.active:
