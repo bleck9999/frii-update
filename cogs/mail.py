@@ -121,6 +121,8 @@ class Loop(commands.Cog):
 
                     embed = discord.Embed()
                     embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
+                    text = ''.join([f"{x} " if x else '' for x in text.replace('\t', ' ').split(sep=' ')])
+                    text = ''.join([f"{x}\n" if x else '' for x in text.split(sep='\n')])
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
 
