@@ -111,10 +111,10 @@ class Loop(commands.Cog):
                     message = BeautifulSoup(res.get_data(), "html.parser")
                     subject = message.find(class_="mail-header__subject").text
                     sender = message.find(class_="mail-header__sender")
-                    if "title" in sender:
+                    try:
                         sender = sender["title"]
-                    else:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
-                        sender = "mail.com Service (service@corp.mail.com)"
+                    except KeyError:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
+                        sender = "mail.com Service <service@corp.mail.com>"
 
                     res = br.open(message.find("iframe")["src"])
                     text = BeautifulSoup(res.get_data(), "html.parser").get_text()

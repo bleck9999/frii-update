@@ -19,8 +19,8 @@ class FriiUpdate(commands.Bot):
         super().__init__(command_prefix, **options)
         for cog in cogs:
             self.load_extension("cogs." + cog)
-            globals()[cog] = importlib.import_module("cogs." + cog)  # "bad practice"
-        self.role = int(config["Bot"]["Role ID"])                    # if it works is it really still stupid?
+            globals()[cog] = importlib.import_module("cogs." + cog)
+        self.role = int(config["Bot"]["Role ID"])
         self.lastcheck = datetime.datetime.utcnow()
         self.interval = int(config["Bot"]["Interval"])
         self.ponged = False
