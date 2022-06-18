@@ -58,6 +58,16 @@ class Loop(commands.Cog):
             for i in range(len(addrs)):
                 self.accounts[addrs[i].strip()] = pws[i]
 
+    @staticmethod
+    def strip_html(text):
+        text = text.strip().replace(' ', ' ').replace('‌', ' ')
+        for x in re.findall(r"\s{2,}", text):
+            if '\n' in x:
+                text = text.replace(x, '\n')
+            else:
+                text = text.replace(x, ' ')
+        return text
+
     async def checkTestmail(self, channel):
         """Uses testmail api (https://testmail.app/)
         Expects a comma seperated list `namespaces` under `Testmail`
@@ -121,8 +131,7 @@ class Loop(commands.Cog):
 
                     embed = discord.Embed()
                     embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
-                    text = ''.join([f"{x} " if x else '' for x in text.replace('\t', ' ').split(sep=' ')])
-                    text = ''.join([f"{x}\n" if x else '' for x in text.split(sep='\n')])
+                    text = self.strip_html(text)
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
 
