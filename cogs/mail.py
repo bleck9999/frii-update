@@ -107,7 +107,11 @@ class Loop(commands.Cog):
             res = br.submit()
             soup = BeautifulSoup(res.get_data(), "html.parser")
             br.open(soup.find_all("meta")[3]["content"][6:])
-            br.follow_link(text="Go to mail.com mailbox with limited functionality")
+            try:
+                br.follow_link(text="Go to mail.com mailbox with limited functionality")
+            except mechanize.LinkNotFoundError:
+                # sometimes a "browser not supported screen shows up instead because of course
+                br.follow_link(text="limited functionality")
             link = br.find_link(text_regex=re.compile("Inbox( \d+ unread)?"))
             res = br.open(link.absolute_url)
             soup = BeautifulSoup(res.get_data(), "html.parser")
