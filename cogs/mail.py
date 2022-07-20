@@ -61,7 +61,8 @@ class Loop(commands.Cog):
     @staticmethod
     def strip_html(text):
         text = text.strip().replace(' ', ' ').replace('‌', ' ')
-        for x in re.findall(r"\s{2,}", text):
+        whitespaces = re.findall(r"\s{2,}", text)
+        for x in whitespaces:
             if '\n' in x:
                 text = text.replace(x, '\n')
             else:
@@ -135,7 +136,7 @@ class Loop(commands.Cog):
 
                     embed = discord.Embed()
                     embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
-                    text = self.strip_html(text)
+                    text = self.strip_html(self.strip_html(text))
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
 
