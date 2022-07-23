@@ -124,6 +124,8 @@ class Loop(commands.Cog):
                     messageurl = item.find(class_="message-list__link mail-panel__link")["href"]
                     res = br.open(messageurl)
                     message = BeautifulSoup(res.get_data(), "html.parser")
+                    # get the absolute URL now because we navigate away later and the relative url would break
+                    bodylink = mechanize.Link(br.geturl(), message.find("iframe")["src"], '', '', '').absolute_url
                     subject = message.find(class_="mail-header__subject").text
                     sender = message.find(class_="mail-header__sender")
                     try:
@@ -131,11 +133,16 @@ class Loop(commands.Cog):
                     except KeyError:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
                         sender = "mail.com Service <service@corp.mail.com>"
 
-                    res = br.open(message.find("iframe")["src"])
+                    details = message.find(href=re.compile(r".+/messagedetail\?[0123456789-]{3,6}\.-messageDetailPanel-mailHeader-showMore.*"))
+                    res = br.open(details["href"])
+                    details = BeautifulSoup(res.get_data(), "html.parser")
+                    recipient = details.find(**{"class_": "mail-detail-header__email", "data-webdriver": "toAddress1"})
+
+                    res = br.open(bodylink)
                     text = BeautifulSoup(res.get_data(), "html.parser").get_text()
 
                     embed = discord.Embed()
-                    embed.set_author(name=f"From: {sender}\nTo: {account[0]}\nSubject: {subject}")
+                    embed.set_author(name=f"From: {sender}\nTo: {recipient.text}\nSubject: {subject}")
                     text = self.strip_html(self.strip_html(text))
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
