@@ -59,7 +59,7 @@ class Loop(commands.Cog):
                 self.accounts[addrs[i].strip()] = pws[i]
 
     @staticmethod
-    def strip_html(text):
+    def strip_whitespace(text):
         text = text.strip().replace(' ', ' ').replace('‌', ' ')
         whitespaces = re.findall(r"\s{2,}", text)
         for x in whitespaces:
@@ -84,7 +84,11 @@ class Loop(commands.Cog):
                     if email not in self.emails:
                         embed = discord.Embed()
                         embed.set_author(name=f"From: {email['from']}\nTo: {email['to']}\nSubject: {email['subject']}")
-                        embed.description = email['text'][:2047]
+                        try :
+                            embed.description = email['text'][:2047]
+                        except TypeError:
+                            text = BeautifulSoup(email['html'], "html.parser").get_text()
+                            embed.description = self.strip_whitespace(self.strip_whitespace(text))[:2047]
                         await channel.send(embed=embed)
                         self.emails.append(email)
                         # reee why cant i give a string and have discord.File do it for me
@@ -111,7 +115,7 @@ class Loop(commands.Cog):
             try:
                 br.follow_link(text="Go to mail.com mailbox with limited functionality")
             except mechanize.LinkNotFoundError:
-                # sometimes a "browser not supported screen shows up instead because of course
+                # sometimes a different "browser not supported screen shows up instead because of course
                 br.follow_link(text="limited functionality")
             link = br.find_link(text_regex=re.compile("Inbox( \d+ unread)?"))
             res = br.open(link.absolute_url)
@@ -143,7 +147,7 @@ class Loop(commands.Cog):
 
                     embed = discord.Embed()
                     embed.set_author(name=f"From: {sender}\nTo: {recipient.text}\nSubject: {subject}")
-                    text = self.strip_html(self.strip_html(text))
+                    text = self.strip_whitespace(self.strip_whitespace(text))
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
 
