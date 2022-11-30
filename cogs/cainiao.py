@@ -25,7 +25,9 @@ class TrackingEvent:
 
 
 class Loop(commands.Cog):
-    """"""
+    """Checks cainiao for shipping updates, given a comma separated list of tracking numbers in frii_update.ini,
+    with the field name "tracking numbers" and the section name "Cainiao"
+    probably a bit unstable because of timezone memes but who really cares"""
     def __init__(self, bot):
         self.bot = bot
         self.conf = configparser.ConfigParser()
