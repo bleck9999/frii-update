@@ -33,7 +33,7 @@ class Loop(commands.Cog):
         self.conf = configparser.ConfigParser()
         self.conf.read("frii_update.ini")
         self.tns = self.conf["Cainiao"]["tracking numbers"].split(sep=",")
-        self.tns = [x.strip() for x in self.tns]
+        self.tns = [x.strip().upper() for x in self.tns]
 
     async def main(self, channel):
         local_tz = datetime.now(timezone.utc).astimezone().tzinfo
@@ -43,8 +43,16 @@ class Loop(commands.Cog):
         raw_data = html.unescape(r.text).split("<textarea style=\"display: none;\" id=\"waybill_list_val_box\">")[1].split("</textarea>")[0]
         tracking_info = json.loads(raw_data)["data"]
 
-        for item in tracking_info:
-            self.bot.log(f"Checking item: {item['mailNo']}")
+        to_remove, to_add = [], []
+        for tn, item in zip(self.tns, tracking_info):
+            if item['mailNo'] != tn:
+                self.bot.log(f"Tracking number mismatch: expected {tn}, got {item['mailNo']}")
+                old_tn = tn
+                to_remove.append(old_tn)
+                tn = item['mailNo'].split(sep=':')[1].replace(')', '')
+                to_add.append(tn)
+                await channel.send(f"Tracking number changed, {old_tn} -> {tn}")
+            self.bot.log(f"Checking item: {tn}")
             latest = TrackingEvent(item["latestTrackingInfo"])
             if latest.time > lastcheck:
                 updates = [latest]
@@ -58,27 +66,39 @@ class Loop(commands.Cog):
 
                 for update in updates[::-1]:
                     embed = discord.Embed()
-                    embed.title = f"Shipping update for item {item['mailNo']}"
+                    embed.title = f"Shipping update for item {tn}"
                     embed.description = f"{update.action_code}: \n{update.desc}\n\nRecieved at {update.time}"
                     await channel.send(embed=embed)
 
-    @commands.command(aliases=["add_tn"])
-    async def add_tracking_numer(self, ctx, number):
-        self.tns.append(number)
-        self.bot.log(f"Adding tracking number {number} (by request)")
+        for item in to_remove:
+            self.modify_tns('del', item)
+        for item in to_add:
+            self.modify_tns('add', item)
+
+    def modify_tns(self, operation, number):
+        number = number.upper()
+        if operation == "del":
+            self.tns.remove(number)
+        elif operation == "add":
+            self.tns.append(number)
+        else:
+            raise Exception("Invalid operation provided")
+
         self.conf["Cainiao"]["tracking numbers"] = ", ".join(self.tns)
         with open("frii_update.ini", 'w') as f:
             self.conf.write(f)
-        await ctx.send(f"Succesfully added {number}")
+
+    @commands.command(aliases=["add_tn"])
+    async def add_tracking_numer(self, ctx, number):
+        self.bot.log(f"Adding tracking number {number.upper()} (by request)")
+        self.modify_tns("add", number)
+        await ctx.send(f"Succesfully added {number.upper()}")
 
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
     async def del_tracking_number(self, ctx, number):
-        self.tns.remove(number)
-        self.bot.log(f"Deleting tracking number {number} (by request)")
-        self.conf["Cainiao"]["tracking numbers"] = ", ".join(self.tns)
-        with open("frii_update.ini", 'w') as f:
-            self.conf.write(f)
-        await ctx.send(f"Succesfully removed {number}")
+        self.bot.log(f"Deleting tracking number {number.upper()} (by request)")
+        self.modify_tns("del", number)
+        await ctx.send(f"Succesfully removed {number.upper()}")
 
 
 def setup(bot):
