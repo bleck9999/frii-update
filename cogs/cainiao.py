@@ -75,11 +75,13 @@ class Loop(commands.Cog):
         for item in to_add:
             self.modify_tns('add', item)
 
-    def modify_tns(self, operation, number):
+    def modify_tns(self, operation, number) -> int:
         number = number.upper()
         if operation == "del":
             self.tns.remove(number)
         elif operation == "add":
+            if number in self.tns:
+                return 1
             self.tns.append(number)
         else:
             raise Exception("Invalid operation provided")
@@ -87,12 +89,15 @@ class Loop(commands.Cog):
         self.conf["Cainiao"]["tracking numbers"] = ", ".join(self.tns)
         with open("frii_update.ini", 'w') as f:
             self.conf.write(f)
+        return 0
 
     @commands.command(aliases=["add_tn"])
-    async def add_tracking_numer(self, ctx, number):
-        self.bot.log(f"Adding tracking number {number.upper()} (by request)")
-        self.modify_tns("add", number)
-        await ctx.send(f"Succesfully added {number.upper()}")
+    async def add_tracking_number(self, ctx, number):
+        number = number.upper()
+        self.bot.log(f"Adding tracking number {number} (by request)")
+        if self.modify_tns("add", number) == 1:
+            return await ctx.send(f"{number} not added (duplicate)")
+        await ctx.send(f"Succesfully added {number}")
 
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
     async def del_tracking_number(self, ctx, number):
