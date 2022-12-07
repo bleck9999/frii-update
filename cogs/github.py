@@ -15,14 +15,12 @@ GHtimestring = "%Y-%m-%dT%H:%M:%SZ"
 
 class Loop(commands.Cog):
     def __init__(self, bot):
-        self.conf = configparser.ConfigParser()
-        self.conf.read("frii_update.ini")
         self.bot = bot
-        self.role = int(self.conf["Bot"]["Role ID"])
+        self.role = int(self.bot.conf["Bot"]["Role ID"])
         self.limits = {}
-        for k in self.conf["Github"]:
+        for k in self.bot.conf["Github"]:
             if "limit" in k.lower():
-                self.limits[k.lower().split(sep=' ')[0]] = int(self.conf["Github"][k])
+                self.limits[k.lower().split(sep=' ')[0]] = int(self.bot.conf["Github"][k])
 
         with open("info.json", "r") as j:
             c = json.load(j)
@@ -57,7 +55,7 @@ class Loop(commands.Cog):
         }
         lastcheck = self.bot.lastcheck
 
-        headers = {"Authorization": f"Bearer {self.conf['Github']['token']}"}
+        headers = {"Authorization": f"Bearer {self.bot.conf['Github']['token']}"}
         transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
         async with Client(transport=transport, fetch_schema_from_transport=True) as session:
             for i in range(len(self.repos)):
@@ -559,7 +557,7 @@ class Loop(commands.Cog):
             x = x.split(sep=':')[0][1:]
             params[x] = self.limits[x]
 
-        headers = {"Authorization": f"Bearer {self.conf['Tokens']['github']}"}
+        headers = {"Authorization": f"Bearer {self.bot.conf['Tokens']['github']}"}
         transport = AIOHTTPTransport(url="https://api.github.com/graphql", headers=headers)
         async with Client(transport=transport, fetch_schema_from_transport=True) as session:
             res = await session.execute(gql(req), variable_values=params)

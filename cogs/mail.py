@@ -19,11 +19,9 @@ class Loop(commands.Cog):
     Further documentation available in checkTestmail and checkMailcom"""
     def __init__(self, bot):
         self.bot = bot
-        self.conf = configparser.ConfigParser()
-        self.conf.read("frii_update.ini")
         self.active = []
 
-        if "Testmail" in self.conf:
+        if "Testmail" in self.bot.conf:
             self.active.append("testmail")
             self.tm_req = """query {
                               inbox(namespace:"NM_REPLACE"){
@@ -37,7 +35,7 @@ class Loop(commands.Cog):
                                 }
                               }
                             }"""
-            self.namespaces = self.conf["Testmail"]["namespaces"].split(sep=',')
+            self.namespaces = self.bot.conf["Testmail"]["namespaces"].split(sep=',')
             self.namespaces = [x.strip() for x in self.namespaces]
 
             try:
@@ -47,14 +45,14 @@ class Loop(commands.Cog):
             self.emails = self.bot.emails  # this gets nuked on restart
             # but emails get nuked after 24 hours with free tier anyway so it's not a big deal
 
-        if "Mail.com" in self.conf:
+        if "Mail.com" in self.bot.conf:
             self.active.append("mail.com")
             self.accounts = {}
             self.localtz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
-            addrs = [x.strip() for x in self.conf["Mail.com"]["addresses"].split(sep=',')]
+            addrs = [x.strip() for x in self.bot.conf["Mail.com"]["addresses"].split(sep=',')]
             # assume nobody has a password that starts or ends with 4 consecutive spaces
             # we dont strip each entry for this reason (above accounts for 1@mail.com,<possible space>2@mail.com
-            pws = self.conf["Mail.com"]["passwords"].split(sep='    ')
+            pws = self.bot.conf["Mail.com"]["passwords"].split(sep='    ')
             for i in range(len(addrs)):
                 self.accounts[addrs[i].strip()] = pws[i]
 
@@ -74,7 +72,7 @@ class Loop(commands.Cog):
         Expects a comma seperated list `namespaces` under `Testmail`
         and token in frii_update.ini for each namespace under `Tokens` with the name `testmail.<namespace>`"""
         for namespace in self.namespaces:
-            headers = {"Authorization": f"Bearer {self.conf['Testmail'][namespace]}"}
+            headers = {"Authorization": f"Bearer {self.bot.conf['Testmail'][namespace]}"}
 
             transport = AIOHTTPTransport(url="https://api.testmail.app/api/graphql", headers=headers)
             async with Client(transport=transport, fetch_schema_from_transport=True) as session:

@@ -17,12 +17,14 @@ config.read("frii_update.ini")
 class FriiUpdate(commands.Bot):
     def __init__(self, command_prefix, **options):
         super().__init__(command_prefix, **options)
+        self.conf = configparser.ConfigParser()
+        self.conf.read("frii_update.ini")
         for cog in cogs:
             self.load_extension("cogs." + cog)
             globals()[cog] = importlib.import_module("cogs." + cog)
-        self.role = int(config["Bot"]["Role ID"])
+        self.role = int(self.conf["Bot"]["Role ID"])
         self.lastcheck = datetime.datetime.utcnow()
-        self.interval = int(config["Bot"]["Interval"])
+        self.interval = int(self.conf["Bot"]["Interval"])
         self.ponged = False
 
     async def on_ready(self):
@@ -37,7 +39,7 @@ class FriiUpdate(commands.Bot):
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
-        channel = await self.fetch_channel(int(config["Bot"]["Channel ID"]))
+        channel = await self.fetch_channel(int(self.conf["Bot"]["Channel ID"]))
         await channel.send(f"<@&{self.role}> an unhandled exception has occurred")
         # by saying this we imply that some errors *are* handled gracefully
         exc = getattr(exception, 'original', exception)
@@ -48,26 +50,24 @@ class FriiUpdate(commands.Bot):
         for page in error_paginator.pages:
             await channel.send(page)
 
-
 cogs = []
 for cog in os.listdir("cogs"):
     cog = cog.split('.')[0]
     if os.path.isfile(f"cogs/{cog}.py"):
         if cog in config["Modules"] and config["Modules"][cog].lower() == "true":
-            FriiUpdate.log(f"Loading {cog}.py")
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] - bot: Loading {cog}.py")
             cogs.append(cog)
 
 intents = Intents.none()
 intents.messages = True
 bot = FriiUpdate(command_prefix=".", intents=intents)
 
-
 @bot.command()
 async def start(ctx):
-    if "Last checked" in config["Bot"].keys():
-        bot.lastcheck = datetime.datetime.strptime(config["Bot"]["Last checked"], "%H%M%S %d%m%Y")
+    if "Last checked" in bot.conf["Bot"].keys():
+        bot.lastcheck = datetime.datetime.strptime(bot.conf["Bot"]["Last checked"], "%H%M%S %d%m%Y")
     await bot.wait_until_ready()
-    channel = await bot.fetch_channel(config["Bot"]["Channel ID"])
+    channel = await bot.fetch_channel(bot.conf["Bot"]["Channel ID"])
 
     while True:
         bot.ponged = False
@@ -78,9 +78,9 @@ async def start(ctx):
             # that day is not today
 
         bot.lastcheck = datetime.datetime.utcnow()
-        config["Bot"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
+        bot.conf["Bot"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
         with open("frii_update.ini", "w") as confFile:
-            config.write(confFile)
+            bot.conf.write(confFile)
         await asyncio.sleep(bot.interval)
 
 
@@ -97,4 +97,6 @@ async def interval(ctx, time):
     await ctx.send(f"Interval set to {time} seconds")
 
 bot.log("Connecting...")
-bot.run(config["Bot"]["Token"])
+token = config["Bot"]["Token"]
+del config
+bot.run(token)

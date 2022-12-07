@@ -32,22 +32,20 @@ class Loop(commands.Cog):
     with the field name "tracking numbers" and the section name "Cainiao" """
     def __init__(self, bot):
         self.bot = bot
-        self.conf = configparser.ConfigParser()
-        self.conf.read("frii_update.ini")
-        self.tns = self.conf["Cainiao"]["tracking numbers"].split(sep=",")
-        self.tns = [x.strip().upper() for x in self.tns]
-        if "last event" not in self.conf["Cainiao"]:
-            self.conf["Cainiao"]["last event"] = ','.join(['0']*len(self.tns))
-        self.ids = {num: event_id for num, event_id in zip(self.tns, self.conf["Cainiao"]["last event"].split(sep=','))}
+        self.__tns = self.bot.conf["Cainiao"]["tracking numbers"].split(sep=",")
+        self.__tns = [x.strip().upper() for x in self.__tns]
+        if "last event" not in self.bot.conf["Cainiao"]:
+            self.bot.conf["Cainiao"]["last event"] = ','.join(['0'] * len(self.__tns))
+        self.ids = {num: event_id for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
 
     async def main(self, channel):
-        r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.tns)}",
+        r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
         raw_data = html.unescape(r.text).split("<textarea style=\"display: none;\" id=\"waybill_list_val_box\">")[1].split("</textarea>")[0]
         tracking_info = json.loads(raw_data)["data"]
 
         to_remove, to_add = [], []
-        for tn, item in zip(self.tns, tracking_info):
+        for tn, item in zip(self.ids.keys(), tracking_info):
             if item['mailNo'] != tn:
                 self.bot.log(f"Tracking number mismatch: expected {tn}, got {item['mailNo']}")
                 old_tn = tn
@@ -73,7 +71,7 @@ class Loop(commands.Cog):
                     embed.description = f"{update.action_code}: \n{update.desc}\n\nRecieved at {update.time}"
                     await channel.send(embed=embed)
 
-            self.ids[tn] = latest.id
+            self.modify_tns("update", tn, latest.id)
 
         for item in to_remove:
             self.modify_tns('del', item)
@@ -81,21 +79,23 @@ class Loop(commands.Cog):
             self.modify_tns('add', item)
 
         with open("frii_update.ini", 'w') as f:
-            self.conf["Cainiao"]["last event"] = ", ".join(self.ids.values())
-            self.conf.write(f)
+            self.bot.conf.write(f)
 
-    def modify_tns(self, operation, number) -> int:
+    def modify_tns(self, operation, number, event='0') -> int:
         number = number.upper()
         if operation == "del":
-            self.tns.remove(number)
+            self.ids.pop(number)
         elif operation == "add":
-            if number in self.tns:
+            if number in self.ids:
                 return 1
-            self.tns.append(number)
+            self.ids[number] = '0'
+        elif operation == "update":
+            self.ids[number] = event
         else:
             raise Exception("Invalid operation provided")
 
-        self.conf["Cainiao"]["tracking numbers"] = ", ".join(self.tns)
+        self.bot.conf["Cainiao"]["tracking numbers"] = ", ".join(self.ids.keys())
+        self.bot.conf["Cainiao"]["last event"] = ', '.join(self.ids.values())
         return 0
 
     @commands.command(aliases=["add_tn"])
@@ -105,7 +105,7 @@ class Loop(commands.Cog):
         if self.modify_tns("add", number) == 1:
             return await ctx.send(f"{number} not added (duplicate)")
         with open("frii_update.ini", 'w') as f:
-            self.conf.write(f)
+            self.bot.conf.write(f)
         await ctx.send(f"Succesfully added {number}")
 
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
@@ -113,7 +113,7 @@ class Loop(commands.Cog):
         self.bot.log(f"Deleting tracking number {number.upper()} (by request)")
         self.modify_tns("del", number)
         with open("frii_update.ini", 'w') as f:
-            self.conf.write(f)
+            self.bot.conf.write(f)
         await ctx.send(f"Succesfully removed {number.upper()}")
 
 
