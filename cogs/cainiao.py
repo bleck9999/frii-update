@@ -1,7 +1,6 @@
 from datetime import datetime
 import discord
 from discord.ext import commands
-import configparser
 import hashlib
 import html
 import json

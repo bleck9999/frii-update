@@ -19,12 +19,13 @@ When loading a module, the bot tries to read an entry with the name of the modul
 (so if the module is `cogs/memes.py`, it will look for `memes`). If this option is set to
 `True` (case insensitive), the module will be loaded. 
 ### [Bot]
-| Option        | Type  | Purpose                                                                                                                                                  |
-|---------------|-------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Role ID       | `Int` | The discord ID of the role to ping for alerts (required)                                                                                                 |
-| Channel ID    | `Int` | The discord ID of the channel to send messages to (required)                                                                                             |
-| Interval      | `Int` | The amount of time to wait (in seconds) before each check                                                                                                |
-| Token         | `Str` | Discord token. Details on how to create one here: https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token                |
+| Option     | Type  | Purpose                                                                                                                                   |
+|------------|-------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| Role ID    | `Int` | The discord ID of the role to ping for alerts (required)                                                                                  |
+| Channel ID | `Int` | The discord ID of the channel to send messages to (required)                                                                              |
+| Interval   | `Int` | The amount of time to wait (in seconds) before each check                                                                                 |
+| Token      | `Str` | Discord token. Details on how to create one here: https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token |
+| Log Level  | `Str` | Currently only two settings: debug (post all exceptions) and error (ignore some exceptions). Implementation depends on module author.     |
 ### [Github]
 | Option        | Type  | Purpose                                                                                                                                                   |
 |---------------|-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|

@@ -1,5 +1,4 @@
 import asyncio
-import configparser
 import json
 import time
 from datetime import datetime
@@ -46,6 +45,17 @@ class Loop(commands.Cog):
         await channel.send(embed=embed)
 
     async def main(self, channel):
+        try:
+            await self.check(channel)
+        except git.exc.GitCommandError as e:  # most of the time these are just generic connection errors
+            if self.bot.conf["Bot"]["log level"].lower() == "debug":
+                raise e
+            self.bot.log(f"Ignoring exception with args {e.args}")
+            await asyncio.sleep(10)
+            self.bot.log("Retrying")
+            await self.main(channel)
+
+    async def check(self, channel):
         reviewStates = {
             "APPROVED": "Changes approved on",
             "CHANGES_REQUESTED": "Changes requested on",

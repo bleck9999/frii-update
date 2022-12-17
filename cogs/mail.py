@@ -1,4 +1,3 @@
-import configparser
 import datetime
 import re
 
@@ -43,7 +42,7 @@ class Loop(commands.Cog):
             except AttributeError:
                 self.bot.emails = []
             self.emails = self.bot.emails  # this gets nuked on restart
-            # but emails get nuked after 24 hours with free tier anyway so it's not a big deal
+            # but emails get nuked after 24 hours with free tier anyway, so it's not a big deal
 
         if "Mail.com" in self.bot.conf:
             self.active.append("mail.com")
@@ -158,7 +157,13 @@ class Loop(commands.Cog):
         if "testmail" in self.active:
             await self.checkTestmail(channel)
         if "mail.com" in self.active:
-            await self.checkMailcom(channel)
+            try:
+                await self.checkMailcom(channel)
+            except mechanize.LinkNotFoundError as e:  # im not sure what exactly causes this but trying again fixes it every time
+                if self.bot.conf["Bot"]["log level"].lower() == "debug":
+                    raise e
+                self.bot.log(f"Ignoring exception with args {e.args}")
+                await self.checkMailcom(channel)
 
     @commands.command()
     async def checkmail(self, ctx):
