@@ -58,12 +58,8 @@ class Loop(commands.Cog):
     @staticmethod
     def strip_whitespace(text):
         text = text.strip().replace(' ', ' ').replace('‌', ' ')
-        whitespaces = re.findall(r"\s{2,}", text)
-        for x in whitespaces:
-            if '\n' in x:
-                text = text.replace(x, '\n')
-            else:
-                text = text.replace(x, ' ')
+        text = re.sub(r" +", ' ', text)
+        text = re.sub(r"(?: *\n+ *)+", '\n', text)
         return text
 
     async def checkTestmail(self, channel):
