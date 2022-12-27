@@ -59,7 +59,7 @@ class Loop(commands.Cog):
                 events = [TrackingEvent(x) for x in item["section1"]["detailList"] + item["section2"]["detailList"]]
                 if len(events) >= 2:
                     for event in events[1:]:
-                        if event.time != self.ids[tn]:
+                        if event.id != self.ids[tn]:
                             updates.append(event)
                         else:
                             break
