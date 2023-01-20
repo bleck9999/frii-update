@@ -115,6 +115,10 @@ class Loop(commands.Cog):
             self.bot.conf.write(f)
         await ctx.send(f"Succesfully removed {number.upper()}")
 
+    @commands.command(aliases=["list_tns"])
+    async def list_tracking_numbers(self, ctx):
+        await ctx.send(embed=discord.Embed(title="List of saved tracking numbers", description='\n'.join(self.ids)))
+
 
 def setup(bot):
     bot.add_cog(Loop(bot))
