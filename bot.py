@@ -5,7 +5,7 @@ import importlib
 import inspect
 import os
 
-
+import discord.ext.commands
 from discord import Intents
 from discord.ext import commands
 from traceback import format_exception
@@ -39,6 +39,8 @@ class FriiUpdate(commands.Bot):
     # Exception handling modified from nh-server/Kurisu
     # Licensed under apache2 (https://www.apache.org/licenses/LICENSE-2.0)
     async def on_command_error(self, ctx, exception):
+        if isinstance(exception, discord.ext.commands.errors.CommandNotFound):
+            return
         channel = await self.fetch_channel(int(self.conf["Bot"]["Channel ID"]))
         await channel.send(f"<@&{self.role}> an unhandled exception has occurred")
         # by saying this we imply that some errors *are* handled gracefully
