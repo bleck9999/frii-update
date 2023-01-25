@@ -53,7 +53,11 @@ class Loop(commands.Cog):
                 to_add.append(tn)
                 await channel.send(f"Tracking number changed, {old_tn} -> {tn}")
             self.bot.log(f"Checking item: {tn}")
-            latest = TrackingEvent(item["latestTrackingInfo"])
+            if "latestTrackingInfo" in item:
+                latest = TrackingEvent(item["latestTrackingInfo"])
+            else:
+                self.bot.log(f"No tracking events found for {tn}")
+                continue
             if latest.id != self.ids[tn]:
                 updates = [latest]
                 events = [TrackingEvent(x) for x in item["section1"]["detailList"] + item["section2"]["detailList"]]
