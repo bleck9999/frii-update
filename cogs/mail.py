@@ -139,7 +139,8 @@ class Loop(commands.Cog):
                     text = BeautifulSoup(res.get_data(), "html.parser").get_text()
 
                     embed = discord.Embed()
-                    embed.set_author(name=f"From: {sender}\nTo: {recipient.text}\nSubject: {subject}")
+                    info = f"From: {sender}\nTo: {recipient.text}\nSubject: {subject}"
+                    embed.set_author(name=info[:256])
                     text = self.strip_whitespace(self.strip_whitespace(text))
                     embed.description = text[:2047]
                     await channel.send(embed=embed)
