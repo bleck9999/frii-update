@@ -47,11 +47,10 @@ class Loop(commands.Cog):
         for tn, item in zip(self.ids.keys(), tracking_info):
             if item['mailNo'] != tn:
                 self.bot.log(f"Tracking number mismatch: expected {tn}, got {item['mailNo']}")
-                old_tn = tn
-                to_remove.append(old_tn)
-                tn = item['mailNo'].split(sep=':')[1].replace(')', '')
-                to_add.append(tn)
-                await channel.send(f"Tracking number changed, {old_tn} -> {tn}")
+                to_remove.append(tn)
+                new_tn = item['mailNo'].split(sep=':')[1].replace(')', '')
+                to_add.append(new_tn)
+                await channel.send(f"Tracking number changed, {tn} -> {new_tn}")
             self.bot.log(f"Checking item: {tn}")
             if "latestTrackingInfo" in item:
                 latest = TrackingEvent(item["latestTrackingInfo"])

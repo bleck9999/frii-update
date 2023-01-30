@@ -70,11 +70,14 @@ async def start(ctx):
         bot.lastcheck = datetime.datetime.strptime(bot.conf["Bot"]["Last checked"], "%H%M%S %d%m%Y")
     await bot.wait_until_ready()
     channel = await bot.fetch_channel(bot.conf["Bot"]["Channel ID"])
+    objects = []
+    for cog in cogs:
+        obj = globals()[cog].Loop(bot)
+        objects.append(obj)
 
     while True:
         bot.ponged = False
-        for cog in cogs:
-            obj = globals()[cog].Loop(bot)
+        for obj in objects:
             await obj.main(channel)
             # maybe at some point i'll use decorators and do it the "proper" way
             # that day is not today
