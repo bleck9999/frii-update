@@ -40,7 +40,12 @@ class Loop(commands.Cog):
     async def main(self, channel):
         r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
-        raw_data = html.unescape(r.text).split("<textarea style=\"display: none;\" id=\"waybill_list_val_box\">")[1].split("</textarea>")[0]
+        try:
+            raw_data = html.unescape(r.text).split("<textarea style=\"display: none;\" id=\"waybill_list_val_box\">")[1].split("</textarea>")[0]
+        except IndexError:
+            if self.bot.conf["Bot"]["log level"].lower() == "debug":
+                await channel.send("Cainiao: captcha detected, skipping")
+            self.bot.log("captcha detected, skipping")
         tracking_info = json.loads(raw_data)["data"]
 
         to_remove, to_add = [], []
