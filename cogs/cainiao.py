@@ -46,6 +46,7 @@ class Loop(commands.Cog):
             if self.bot.conf["Bot"]["log level"].lower() == "debug":
                 await channel.send("Cainiao: captcha detected, skipping")
             self.bot.log("captcha detected, skipping")
+            return
         tracking_info = json.loads(raw_data)["data"]
 
         to_remove, to_add = [], []
