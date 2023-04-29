@@ -35,7 +35,7 @@ class Loop(commands.Cog):
         self.__tns = [x.strip().upper() for x in self.__tns]
         if "last event" not in self.bot.conf["Cainiao"]:
             self.bot.conf["Cainiao"]["last event"] = ','.join(['0'] * len(self.__tns))
-        self.ids = {num: event_id for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
+        self.ids = {num: event_id.strip() for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
 
     async def main(self, channel):
         self = self.__class__(self.bot)  # we're writing the good code today
