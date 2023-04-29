@@ -38,6 +38,7 @@ class Loop(commands.Cog):
         self.ids = {num: event_id for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
 
     async def main(self, channel):
+        self = self.__class__(self.bot)  # we're writing the good code today
         r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
         try:
@@ -80,7 +81,7 @@ class Loop(commands.Cog):
                     await channel.send(embed=embed)
 
             self.modify_tns("update", tn, latest.id)
-
+        
         for item in to_remove:
             self.modify_tns('del', item)
         for item in to_add:
@@ -90,13 +91,16 @@ class Loop(commands.Cog):
             self.bot.conf.write(f)
 
     def modify_tns(self, operation, number, event='0') -> int:
+        self.bot.log(self.ids)
         number = number.upper()
         if operation == "del":
+            if number not in self.ids:
+                return 2
             self.ids.pop(number)
         elif operation == "add":
             if number in self.ids:
                 return 1
-            self.ids[number] = '0'
+            self.ids[number] = event
         elif operation == "update":
             self.ids[number] = event
         else:
@@ -104,6 +108,7 @@ class Loop(commands.Cog):
 
         self.bot.conf["Cainiao"]["tracking numbers"] = ", ".join(self.ids.keys())
         self.bot.conf["Cainiao"]["last event"] = ', '.join(self.ids.values())
+        self.bot.log(self.ids)
         return 0
 
     @commands.command(aliases=["add_tn"])
@@ -119,7 +124,8 @@ class Loop(commands.Cog):
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
     async def del_tracking_number(self, ctx, number):
         self.bot.log(f"Deleting tracking number {number.upper()} (by request)")
-        self.modify_tns("del", number)
+        if self.modify_tns("del", number) == 2:
+            return await ctx.send(f"{number} not deleted (not found)")
         with open("frii_update.ini", 'w') as f:
             self.bot.conf.write(f)
         await ctx.send(f"Succesfully removed {number.upper()}")
