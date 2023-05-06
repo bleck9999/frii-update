@@ -108,7 +108,6 @@ class Loop(commands.Cog):
 
         self.bot.conf["Cainiao"]["tracking numbers"] = ", ".join(self.ids.keys())
         self.bot.conf["Cainiao"]["last event"] = ', '.join(self.ids.values())
-        self.bot.log(self.ids)
         return 0
 
     @commands.command(aliases=["add_tn"])
