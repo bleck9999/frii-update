@@ -58,8 +58,8 @@ class Loop(commands.Cog):
     @staticmethod
     def strip_whitespace(text):
         text = text.strip().replace(' ', ' ').replace('‌', ' ')
-        text = re.sub(r" +", ' ', text)
-        text = re.sub(r"(?: *\n+ *)+", '\n', text)
+        text = re.sub(r"[ \t]+", ' ', text)
+        text = re.sub(r"( *\n+ *)+", '\n', text)
         return text
 
     async def checkTestmail(self, channel):
@@ -123,26 +123,24 @@ class Loop(commands.Cog):
                     message = BeautifulSoup(res.get_data(), "html.parser")
                     # get the absolute URL now because we navigate away later and the relative url would break
                     bodylink = mechanize.Link(br.geturl(), message.find("iframe")["src"], '', '', '').absolute_url
-                    subject = message.find(class_="mail-header__subject").text
-                    sender = message.find(class_="mail-header__sender")
-                    try:
-                        sender = sender["title"]
-                    except KeyError:  # fukin email verification "ooo look at me i have a checkmark so you know im real"
-                        sender = "mail.com Service <service@corp.mail.com>"
 
                     details = message.find(href=re.compile(r".+/messagedetail\?[0123456789-]{3,6}\.-messageDetailPanel-mailHeader-showMore.*"))
                     res = br.open(details["href"])
                     details = BeautifulSoup(res.get_data(), "html.parser")
-                    recipient = details.find(**{"class_": "mail-detail-header__email", "data-webdriver": "toAddress1"})
+                    subject = details.find(**{"class_": "mail-detail-header__content", "data-webdriver": "subject"}).text
+                    recipient = details.find(**{"class_": "mail-detail-header__email", "data-webdriver": "toAddress1"}).text
+                    sendername = details.find(**{"class_": "mail-detail-header__name"}).text  # doesn't have a webdriver label fsr
+                    senderaddr = details.find(**{"class_": "mail-detail-header__email", "data-webdriver": "fromAddress1"}).text
+                    receivedon = details.find(**{"class_": "mail-detail-header__content", "data-webdriver": "date"}).text
 
                     res = br.open(bodylink)
                     text = BeautifulSoup(res.get_data(), "html.parser").get_text()
 
                     embed = discord.Embed()
-                    info = f"From: {sender}\nTo: {recipient.text}\nSubject: {subject}"
+                    info = f'From: "{sendername}" <{senderaddr}>\nTo: {recipient}\nSubject: {subject}'
                     embed.set_author(name=info[:256])
                     text = self.strip_whitespace(self.strip_whitespace(text))
-                    embed.description = text[:2047]
+                    embed.description = text[:2000] + f"\n\nRecieved on: {receivedon}"
                     await channel.send(embed=embed)
 
                     htmlfile = discord.File(io.BytesIO(res.get_data()), filename="email.html")
