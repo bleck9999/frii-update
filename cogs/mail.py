@@ -152,13 +152,7 @@ class Loop(commands.Cog):
         if "testmail" in self.active:
             await self.checkTestmail(channel)
         if "mail.com" in self.active:
-            try:
-                await self.checkMailcom(channel)
-            except mechanize.LinkNotFoundError as e:  # im not sure what exactly causes this but trying again fixes it every time
-                if self.bot.conf["Bot"]["log level"].lower() == "debug":
-                    raise e
-                self.bot.log(f"Ignoring exception with args {e.args}")
-                await self.checkMailcom(channel)
+            await self.checkMailcom(channel)
 
     @commands.command()
     async def checkmail(self, ctx):
@@ -172,7 +166,7 @@ class Loop(commands.Cog):
 
     @commands.command()
     async def listsaved(self, ctx, verbosity=1):
-        """Retrieves stored tesmail emails. Verbosity:
+        """Retrieves stored testmail emails. Verbosity:
         1: show subject and sender info only (default)
         2: also show text field
         3: show everything"""

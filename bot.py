@@ -78,9 +78,17 @@ async def start(ctx):
     while True:
         bot.ponged = False
         for obj in objects:
-            await obj.main(channel)
-            # maybe at some point i'll use decorators and do it the "proper" way
-            # that day is not today
+            attempts = 0
+            while True:
+                try:
+                    await obj.main(channel)
+                except Exception as e:
+                    if attempts >= 3:
+                        raise e
+                    attempts += 1
+                    bot.log(f"Ignoring exception with args {e.args}")
+                    await asyncio.sleep(10)
+                    bot.log("Retrying")
 
         bot.lastcheck = datetime.datetime.utcnow()
         bot.conf["Bot"]["Last checked"] = bot.lastcheck.strftime("%H%M%S %d%m%Y")
