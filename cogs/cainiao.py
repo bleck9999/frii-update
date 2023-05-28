@@ -91,7 +91,6 @@ class Loop(commands.Cog):
             self.bot.conf.write(f)
 
     def modify_tns(self, operation, number, event='0') -> int:
-        self.bot.log(self.ids)
         number = number.upper()
         if operation == "del":
             if number not in self.ids:
