@@ -82,6 +82,7 @@ async def start(ctx):
             while True:
                 try:
                     await obj.main(channel)
+                    break
                 except Exception as e:
                     if attempts >= 3:
                         raise e
