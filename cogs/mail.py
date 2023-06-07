@@ -114,6 +114,7 @@ class Loop(commands.Cog):
             res = br.open(link.absolute_url)
             soup = BeautifulSoup(res.get_data(), "html.parser")
 
+            emails = []
             for item in soup.find_all("li"):
                 if item["class"] == ["message-list__item", "mail-panel", "is-unread"]:
                     returnaddr = br.geturl()
@@ -141,12 +142,14 @@ class Loop(commands.Cog):
                     embed.set_author(name=info[:256])
                     text = self.strip_whitespace(self.strip_whitespace(text))
                     embed.description = text[:2000] + f"\n\nRecieved on: {receivedon}"
-                    await channel.send(embed=embed)
-
                     htmlfile = discord.File(io.BytesIO(res.get_data()), filename="email.html")
-                    await channel.send(file=htmlfile)
 
+                    emails.append((embed, htmlfile))
                     br.open(returnaddr)
+
+            for email in emails[::-1]:
+                await channel.send(embed=email[0])
+                await channel.send(file=email[1])
 
     async def main(self, channel):
         if "testmail" in self.active:
