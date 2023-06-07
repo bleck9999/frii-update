@@ -75,6 +75,8 @@ class Loop(commands.Cog):
                             break
 
                 for update in updates[::-1]:
+                    if update.action_code == "GTMS_SIGNED":
+                        to_remove.append(tn)  # order delivered
                     embed = discord.Embed()
                     embed.title = f"Shipping update for item {tn}"
                     embed.description = f"{update.action_code}: \n{update.desc}\n\nRecieved at {update.time}"
