@@ -31,6 +31,9 @@ class Loop(commands.Cog):
     with the field name "tracking numbers" and the section name "Cainiao" """
     def __init__(self, bot):
         self.bot = bot
+        self.update_state()
+
+    def update_state(self):
         self.__tns = self.bot.conf["Cainiao"]["tracking numbers"].split(sep=",")
         self.__tns = [x.strip().upper() for x in self.__tns]
         if "last event" not in self.bot.conf["Cainiao"]:
@@ -38,6 +41,10 @@ class Loop(commands.Cog):
         self.ids = {num: event_id.strip() for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
 
     async def main(self, channel):
+        self.update_state()
+        if '' in self.ids:  # extremely large mind workaround to broken code
+            self.modify_tns("del", '')
+                
         self = self.__class__(self.bot)  # we're writing the good code today
         r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
@@ -113,6 +120,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["add_tn"])
     async def add_tracking_number(self, ctx, number):
+        self.update_state()
         number = number.upper()
         self.bot.log(f"Adding tracking number {number} (by request)")
         if self.modify_tns("add", number) == 1:
@@ -123,7 +131,8 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
     async def del_tracking_number(self, ctx, number):
-        self.bot.log(f"Deleting tracking number {number.upper()} (by request)")
+        self.update_state()
+        self.bot.log(f"Deleting tracking number {number.upper()} (source: del_tn)")
         if self.modify_tns("del", number) == 2:
             return await ctx.send(f"{number} not deleted (not found)")
         with open("frii_update.ini", 'w') as f:
@@ -132,6 +141,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["list_tns"])
     async def list_tracking_numbers(self, ctx):
+        self.update_state()
         await ctx.send(embed=discord.Embed(title="List of saved tracking numbers", description='\n'.join(self.ids)))
 
 
