@@ -52,6 +52,7 @@ class FriiUpdate(commands.Bot):
         for page in error_paginator.pages:
             await channel.send(page)
 
+
 cogs = []
 for cog in os.listdir("cogs"):
     cog = cog.split('.')[0]
@@ -64,24 +65,21 @@ intents = Intents.none()
 intents.messages = True
 bot = FriiUpdate(command_prefix=".", intents=intents)
 
+
 @bot.command()
 async def start(ctx):
     if "Last checked" in bot.conf["Bot"].keys():
         bot.lastcheck = datetime.datetime.strptime(bot.conf["Bot"]["Last checked"], "%H%M%S %d%m%Y")
     await bot.wait_until_ready()
     channel = await bot.fetch_channel(bot.conf["Bot"]["Channel ID"])
-    objects = []
-    for cog in cogs:
-        obj = globals()[cog].Loop(bot)
-        objects.append(obj)
 
     while True:
         bot.ponged = False
-        for obj in objects:
+        for obj in bot.extensions.values():
             attempts = 0
             while True:
                 try:
-                    await obj.main(channel)
+                    await obj.Loop(bot).main(channel)
                     break
                 except Exception as e:
                     if attempts >= 3:
@@ -96,6 +94,18 @@ async def start(ctx):
         with open("frii_update.ini", "w") as confFile:
             bot.conf.write(confFile)
         await asyncio.sleep(bot.interval)
+
+
+@bot.command()
+async def load(ctx, module):
+    bot.load_extension("cogs."+module)
+    await ctx.send(f"Loaded {module}")
+
+
+@bot.command()
+async def unload(ctx, module):
+    bot.unload_extension("cogs."+module)
+    await ctx.send(f"Unloaded {module}")
 
 
 @bot.command()
