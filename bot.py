@@ -73,13 +73,17 @@ async def start(ctx):
     await bot.wait_until_ready()
     channel = await bot.fetch_channel(bot.conf["Bot"]["Channel ID"])
 
+    objects = {}
     while True:
         bot.ponged = False
-        for obj in bot.extensions.values():
+        for module in bot.extensions.values():
             attempts = 0
+            if module.__name__ not in objects:
+                objects[module.__name__] = module.Loop(bot)
+            obj = objects[module.__name__]
             while True:
                 try:
-                    await obj.Loop(bot).main(channel)
+                    await obj.main(channel)
                     break
                 except Exception as e:
                     if attempts >= 3:

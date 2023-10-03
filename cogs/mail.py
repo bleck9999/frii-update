@@ -63,6 +63,7 @@ class Loop(commands.Cog):
         return text
 
     async def checkTestmail(self, channel):
+        print(id(self))
         """Uses testmail api (https://testmail.app/)
         Expects a comma seperated list `namespaces` under `Testmail`
         and token in frii_update.ini for each namespace under `Tokens` with the name `testmail.<namespace>`"""
