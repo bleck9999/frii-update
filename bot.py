@@ -76,7 +76,8 @@ async def start(ctx):
     objects = {}
     while True:
         bot.ponged = False
-        for module in bot.extensions.values():
+        values = list(bot.extensions.values())
+        for module in values:
             attempts = 0
             if module.__name__ not in objects:
                 objects[module.__name__] = module.Loop(bot)
