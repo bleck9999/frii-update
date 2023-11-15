@@ -27,11 +27,28 @@ class TrackingEvent:
 
 
 class Loop(commands.Cog):
-    """Checks cainiao for shipping updates, given a comma separated list of tracking numbers in frii_update.ini,
-    with the field name "tracking numbers" and the section name "Cainiao" """
+    """Checks cainiao for shipping updates
+    Expects dict[tracking_number (str) : event_hash (str)] in cainiao/info.json
+    if setting up for the first time, leave the event hash as an empty string"""
     def __init__(self, bot):
         self.bot = bot
-        self.update_state()
+        if "Cainiao" in self.bot.conf:
+            self.update_state()
+            self.migrate_ini_config()
+        else:
+            self.ids: dict[str: str] = {}
+            with open("cogs/cainiao/info.json", 'r') as f:
+                self.ids = json.load(f)
+
+    def migrate_ini_config(self):
+        import os
+        if not os.path.isdir("cogs/cainiao"):
+            os.mkdir("cogs/cainiao")
+            with open("cogs/cainiao/info.json", 'w') as f:
+                json.dump(self.ids, f)
+        self.bot.log("Configuration data has been moved to cogs/cainiao/info.json, "
+                     "please remove the [Cainiao] section from frii_update.ini")
+        raise RuntimeError("Please remove the [Cainiao] section from frii_update.ini")
 
     def update_state(self):
         self.__tns = self.bot.conf["Cainiao"]["tracking numbers"].split(sep=",")
@@ -41,11 +58,9 @@ class Loop(commands.Cog):
         self.ids = {num: event_id.strip() for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
 
     async def main(self, channel):
-        self.update_state()
-        if '' in self.ids:  # extremely large mind workaround to broken code
-            self.modify_tns("del", '')
-                
-        self = self.__class__(self.bot)  # we're writing the good code today
+        # if '' in self.ids:  # should be unnecessary now
+        #     self.modify_tns("del", '')
+
         r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
         try:
@@ -96,9 +111,6 @@ class Loop(commands.Cog):
         for item in to_add:
             self.modify_tns('add', item)
 
-        with open("frii_update.ini", 'w') as f:
-            self.bot.conf.write(f)
-
     def modify_tns(self, operation, number, event='0') -> int:
         number = number.upper()
         if operation == "del":
@@ -114,8 +126,9 @@ class Loop(commands.Cog):
         else:
             raise Exception("Invalid operation provided")
 
-        self.bot.conf["Cainiao"]["tracking numbers"] = ", ".join(self.ids.keys())
-        self.bot.conf["Cainiao"]["last event"] = ', '.join(self.ids.values())
+        with open("cogs/cainiao/info.json", 'w') as f:
+            json.dump(self.ids, f)
+
         return 0
 
     @commands.command(aliases=["add_tn"])
@@ -125,8 +138,6 @@ class Loop(commands.Cog):
         self.bot.log(f"Adding tracking number {number} (by request)")
         if self.modify_tns("add", number) == 1:
             return await ctx.send(f"{number} not added (duplicate)")
-        with open("frii_update.ini", 'w') as f:
-            self.bot.conf.write(f)
         await ctx.send(f"Succesfully added {number}")
 
     @commands.command(aliases=["delete_tracking_number", "del_tn"])
@@ -135,8 +146,6 @@ class Loop(commands.Cog):
         self.bot.log(f"Deleting tracking number {number.upper()} (source: del_tn)")
         if self.modify_tns("del", number) == 2:
             return await ctx.send(f"{number} not deleted (not found)")
-        with open("frii_update.ini", 'w') as f:
-            self.bot.conf.write(f)
         await ctx.send(f"Succesfully removed {number.upper()}")
 
     @commands.command(aliases=["list_tns"])
