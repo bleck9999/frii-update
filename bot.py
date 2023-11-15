@@ -55,8 +55,8 @@ class FriiUpdate(commands.Bot):
 
 cogs = []
 for cog in os.listdir("cogs"):
-    cog = cog.split('.')[0]
-    if os.path.isfile(f"cogs/{cog}.py"):
+    if cog.split('.')[-1] == "py":
+        cog = cog.split('.')[0]
         if cog in config["Modules"] and config["Modules"][cog].lower() == "true":
             print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] - bot: Loading {cog}.py")
             cogs.append(cog)
