@@ -20,12 +20,30 @@ class Loop(commands.Cog):
         for k in self.bot.conf["Github"]:
             if "limit" in k.lower():
                 self.limits[k.lower().split(sep=' ')[0]] = int(self.bot.conf["Github"][k])
-
-        with open("info.json", "r") as j:
+        self.infomigration()
+        with open("cogs/github/info.json", "r") as j:
             c = json.load(j)
-            self.repos = c["repos"]
+            self.repos = c
             for i in self.repos:
                 i[1] = discord.Color(i[1])
+
+    def infomigration(self):
+        import os
+        if os.path.exists("info.json"):
+            try:
+                os.mkdir("cogs/github")
+                os.mkdir("cogs/sysupdates")
+                c = json.load(open("info.json", 'r'))
+                repos, sysupdates = c["repos"], c["sysupdates"]
+                with open("cogs/github/info.json", 'w') as f:
+                    json.dump(repos, f)
+                with open("cogs/sysupdates/info.json", 'w') as f:
+                    json.dump(sysupdates, f)
+
+                os.remove("info.json")
+            except Exception as e:
+                self.bot.log("info.json migration failed!")
+                raise e
 
     async def send_embed(self, channel, title, url, description, datemsg, date, author, author_url, thumbnail, i):
         embed = discord.Embed(title=title, color=self.repos[i][1])
