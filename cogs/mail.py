@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 
 import discord
@@ -7,8 +8,7 @@ import io
 
 from bs4 import BeautifulSoup
 from discord.ext import commands
-from gql import gql, Client
-from gql.transport.aiohttp import AIOHTTPTransport
+from cogs.mailutils import strip_whitespace
 
 
 class Loop(commands.Cog):
@@ -18,82 +18,33 @@ class Loop(commands.Cog):
     Further documentation available in checkTestmail and checkMailcom"""
     def __init__(self, bot):
         self.bot = bot
-        self.active = []
 
-        if "Testmail" in self.bot.conf:
-            self.active.append("testmail")
-            self.tm_req = """query {
-                              inbox(namespace:"NM_REPLACE"){
-                                emails{
-                                  from
-                                  html
-                                  subject
-                                  text
-                                  timestamp
-                                  to
-                                }
-                              }
-                            }"""
-            self.namespaces = self.bot.conf["Testmail"]["namespaces"].split(sep=',')
-            self.namespaces = [x.strip() for x in self.namespaces]
-
-            try:
-                getattr(self.bot, "emails")
-            except AttributeError:
-                self.bot.emails = []
-            self.emails = self.bot.emails  # this gets nuked on restart
-            # but emails get nuked after 24 hours with free tier anyway, so it's not a big deal
-
+        self.accounts: dict[str: str] = {}
+        self.localtz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
         if "Mail.com" in self.bot.conf:
-            self.active.append("mail.com")
-            self.accounts = {}
-            self.localtz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
             addrs = [x.strip() for x in self.bot.conf["Mail.com"]["addresses"].split(sep=',')]
             # assume nobody has a password that starts or ends with 4 consecutive spaces
             # we dont strip each entry for this reason (above accounts for 1@mail.com,<possible space>2@mail.com
             pws = self.bot.conf["Mail.com"]["passwords"].split(sep='    ')
             for i in range(len(addrs)):
                 self.accounts[addrs[i].strip()] = pws[i]
+            self.migrate_ini_config()
+        else:
+            with open("cogs/mail.com/info.json", 'r') as f:
+                self.accounts = json.load(f)
 
-    @staticmethod
-    def strip_whitespace(text):
-        text = text.strip().replace(' ', ' ').replace('‌', ' ')
-        text = re.sub(r"[ \t]+", ' ', text)
-        text = re.sub(r"( *\n+ *)+", '\n', text)
-        return text
+    def migrate_ini_config(self):
+        import os
+        if not os.path.isdir("cogs/mail.com"):
+            os.mkdir("cogs/mail.com")
+            with open("cogs/mail.com/info.json", 'w') as f:
+                json.dump(self.accounts, f)
+        self.bot.log("Configuration data has been moved to cogs/mail.com/info.json, "
+                     "please remove the [Mail.com] section from frii_update.ini")
 
-    async def checkTestmail(self, channel):
-        """Uses testmail api (https://testmail.app/)
-        Expects a comma seperated list `namespaces` under `Testmail`
-        and token in frii_update.ini for each namespace under `Tokens` with the name `testmail.<namespace>`"""
-        for namespace in self.namespaces:
-            headers = {"Authorization": f"Bearer {self.bot.conf['Testmail'][namespace]}"}
-
-            transport = AIOHTTPTransport(url="https://api.testmail.app/api/graphql", headers=headers)
-            async with Client(transport=transport, fetch_schema_from_transport=True) as session:
-                self.bot.log(f"Checking testmail namespace {namespace}")
-                result = await session.execute(gql(self.tm_req.replace("NM_REPLACE", namespace)))
-                for email in result["inbox"]["emails"]:
-                    if email not in self.emails:
-                        embed = discord.Embed()
-                        embed.set_author(name=f"From: {email['from']}\nTo: {email['to']}\nSubject: {email['subject']}")
-                        try :
-                            embed.description = email['text'][:2047]
-                        except TypeError:
-                            text = BeautifulSoup(email['html'], "html.parser").get_text()
-                            embed.description = self.strip_whitespace(self.strip_whitespace(text))[:2047]
-                        await channel.send(embed=embed)
-                        self.emails.append(email)
-                        # reee why cant i give a string and have discord.File do it for me
-                        sio = io.StringIO(email["html"])
-                        bio = io.BytesIO(sio.read().encode('utf8'))
-                        htmlfile = discord.File(bio, filename="email.html")
-                        await channel.send(file=htmlfile)
-
-    async def checkMailcom(self, channel):
+    async def main(self, channel):
         """Scrapes mail.com using mechanize and bs4
-        Expects comma seperated list `addresses` under `Mail.com`
-        and corresponding `passwords` seperated by 4 spaces"""
+        Expects dict[email (str) : password (str)] in mail/info.json"""
         for account in self.accounts.items():
             self.bot.log(f"Checking mail.com account {account[0]}")
             br = mechanize.Browser()
@@ -140,7 +91,7 @@ class Loop(commands.Cog):
                     embed = discord.Embed()
                     info = f'From: "{sendername}" <{senderaddr}>\nTo: {recipient}\nSubject: {subject}'
                     embed.set_author(name=info[:256])
-                    text = self.strip_whitespace(self.strip_whitespace(text))
+                    text = strip_whitespace(strip_whitespace(text))
                     embed.description = text[:2000] + f"\n\nRecieved on: {receivedon}"
                     htmlfile = discord.File(io.BytesIO(res.get_data()), filename="email.html")
 
@@ -151,42 +102,9 @@ class Loop(commands.Cog):
                 await channel.send(embed=email[0])
                 await channel.send(file=email[1])
 
-    async def main(self, channel):
-        if "testmail" in self.active:
-            await self.checkTestmail(channel)
-        if "mail.com" in self.active:
-            await self.checkMailcom(channel)
-
     @commands.command()
-    async def checkmail(self, ctx):
+    async def checkmailcom(self, ctx):
         await self.main(ctx)
-
-    @commands.command()
-    async def clearmail(self, ctx):
-        """Clears temporary storage of tesmail emails"""
-        self.bot.emails = []
-        return await ctx.send("Cleared!")
-
-    @commands.command()
-    async def listsaved(self, ctx, verbosity=1):
-        """Retrieves stored testmail emails. Verbosity:
-        1: show subject and sender info only (default)
-        2: also show text field
-        3: show everything"""
-        if not self.bot.emails:
-            return await ctx.send("No emails saved!")
-        for email in self.bot.emails:
-            embed = discord.Embed()
-            embed.set_author(name=f"From: {email['from']}\nTo: {email['to']}\nSubject: {email['subject']}")
-            if verbosity >= 2:
-                embed.description = email['text'][:2047]
-            await ctx.send(embed=embed)
-            if verbosity >= 3:
-                sio = io.StringIO(email["html"])
-                bio = io.BytesIO(sio.read().encode('utf8'))
-                htmlfile = discord.File(bio, filename="email.html")
-                await ctx.send(file=htmlfile)
-
 
 def setup(bot):
     bot.add_cog(Loop(bot))
