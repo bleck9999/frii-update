@@ -32,13 +32,17 @@ class Loop(commands.Cog):
     if setting up for the first time, leave the event hash as an empty string"""
     def __init__(self, bot):
         self.bot = bot
+        self.ids: dict[str: str] = {}
         if "Cainiao" in self.bot.conf:
-            self.update_state()
+            tns = self.bot.conf["Cainiao"]["tracking numbers"].split(sep=",")
+            tns = [x.strip().upper() for x in tns]
+            if "last event" not in self.bot.conf["Cainiao"]:
+                self.bot.conf["Cainiao"]["last event"] = ','.join(['0'] * len(tns))
+            self.ids = {num: event_id.strip() for num, event_id in
+                        zip(tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
             self.migrate_ini_config()
         else:
-            self.ids: dict[str: str] = {}
-            with open("cogs/cainiao/info.json", 'r') as f:
-                self.ids = json.load(f)
+            self.update_state()
 
     def migrate_ini_config(self):
         import os
@@ -51,11 +55,8 @@ class Loop(commands.Cog):
         raise RuntimeError("Please remove the [Cainiao] section from frii_update.ini")
 
     def update_state(self):
-        self.__tns = self.bot.conf["Cainiao"]["tracking numbers"].split(sep=",")
-        self.__tns = [x.strip().upper() for x in self.__tns]
-        if "last event" not in self.bot.conf["Cainiao"]:
-            self.bot.conf["Cainiao"]["last event"] = ','.join(['0'] * len(self.__tns))
-        self.ids = {num: event_id.strip() for num, event_id in zip(self.__tns, self.bot.conf["Cainiao"]["last event"].split(sep=','))}
+        with open("cogs/cainiao/info.json", 'r') as f:
+            self.ids = json.load(f)
 
     async def main(self, channel):
         # if '' in self.ids:  # should be unnecessary now
