@@ -59,8 +59,7 @@ class Loop(commands.Cog):
             self.ids = json.load(f)
 
     async def main(self, channel):
-        # if '' in self.ids:  # should be unnecessary now
-        #     self.modify_tns("del", '')
+        self.update_state()
 
         r = requests.get(f"https://global.cainiao.com/detail.htm?mailNoList={'%2C'.join(self.ids.keys())}",
                          headers={"Cookie": "grayVersion=1; userSelectTag=0"})
