@@ -89,6 +89,37 @@ class Loop(commands.Cog):
             self.refresh_token = j["refresh_token"]
             self.save_state()
 
+    @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
+    async def torbox_get_otp(self, ctx, email):
+        if not self.apikey:
+            return await ctx.send("API key not provided")
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(f"{self.auth_url}/otp",
+                             data=json.dumps({"email": email}),
+                             headers=self.noauth_hd)
+            if r.status != 200:
+                await ctx.send("Failed to send email")
+                print(await r.json())
+            else:
+                await ctx.send("Magic link sent successfully, check your email "
+                               "and use `torbox_get_token` with the magic link")
+
+    @commands.command(aliases=["tr_get_token"])
+    async def torbox_get_token(self, ctx, link):
+        # if you try using the raw link you actually get cucked by the discord embed crawler
+        # it will get the link to try and generate an embed preview which also then invalidates it
+        # so an alternate solution is required
+        # either send the link through a different channel (like stdin)
+        # or put <> around the link to stop discord trying to embed it
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(link, allow_redirects=False)
+            print(await r.content.read())
+            url = r.headers["Location"]
+            r = await s.get(url, allow_redirects=False)
+            await r.content.read()
+            # if 
+            return
+
     async def fuzzy_torrent_by_name(self, ctx, name):
         if await self.refresh_auth():
             return await ctx.send("Authentication failed, reconfigure token")
