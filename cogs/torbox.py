@@ -12,6 +12,9 @@ class TorrentState:
     def __init__(self, state: str):
         self.state = state
 
+    def __repr__(self):
+        return self.state
+
     @property
     def downloading(self):
         return self.state in ["downloading"]
@@ -119,9 +122,9 @@ class Loop(commands.Cog):
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/api_tokens?select=token&auth_id=eq.{auth_id}",
                             headers=self.hd_db_authed)
-            r = await r.json()
             if r.status != 200:
                 return {"failed": "true"}
+            r = await r.json()
             headers = {"Authorization": f"Bearer {r[0]['token']}",
                        "Content-Type": "application/json"}
             return headers
@@ -190,13 +193,44 @@ class Loop(commands.Cog):
             elif mode == "file":
                 pass  # todo
 
+    @commands.command(alias="tr_add_magnet")
+    async def torbox_add_magnet(self, ctx, magnet):
+        if await self.refresh_db_auth():
+            return await ctx.send("Authentication failed, reconfigure token")
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{self.db_url}/users?select=auth_id", headers=self.hd_db_authed)
+            r = await r.json()
+            headers = await self.get_api_headers(r[0]["auth_id"])
+            headers.pop("Content-Type")
+            r = await s.post(f"{self.api_url}/createtorrent",
+                             data={"magnet": magnet},
+                             headers=headers)
+            j = await r.json()
+            return await ctx.send(j["detail"])
+
+    @commands.command(aliases=["tr_list_torrents"])
+    async def torbox_list_torrents(self, ctx):
+        if await self.refresh_db_auth():
+            return await ctx.send("Authentication failed, reconfigure token")
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{self.db_url}/torrents?select=*",
+                            headers=self.hd_db_authed)
+            if r.status != 200:
+                return await ctx.send("Failed to fetch torrent information")
+            torrents = await r.json()
+            if len(torrents) == 0:
+                return await ctx.send("No torrents found")
+            await ctx.send("Currently active torrents:")
+            for torrent in torrents:
+                await self.send_torrent(ctx, torrent)
+
     @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
-    async def torbox_get_otp(self, ctx, email):
+    async def torbox_get_otp(self, ctx, email, create_user=False):
         if not self.db_api_key:
             return await ctx.send("API key not provided")
         async with aiohttp.ClientSession() as s:
             r = await s.post(f"{self.auth_url}/otp",
-                             data=json.dumps({"email": email}),
+                             data=json.dumps({"email": email, "create_user": bool(create_user)}),
                              headers=self.hd_db_noauth)
             if r.status != 200:
                 await ctx.send("Failed to send email")
