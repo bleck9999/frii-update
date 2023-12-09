@@ -8,16 +8,41 @@ import aiohttp
 from datetime import timedelta
 
 
+class TorrentState:
+    def __init__(self, state: str):
+        self.state = state
+
+    @property
+    def downloading(self):
+        return self.state in ["downloading"]
+
+    @property
+    def uploading(self):
+        return self.state not in ["paused", "Completed", "stalledUP"]
+
+    @property
+    def completed(self):
+        return self.state not in ["Completed", "uploading", "stalledUP"]
+
+    @property
+    def in_progress(self):
+        return self.state not in ["Completed", "paused", "uploading", "stalledUP"]
+
+    @property
+    def download_available(self):
+        return self.state in ["uploading", "stalledUP"]
+
+
 class Loop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.auth_url = "https://db.torbox.app/auth/v1"
         self.db_url = "https://db.torbox.app/rest/v1"
-        self.control_url = "https://api.torbox.app/v1/api/t/controltorrent"
+        self.api_url = "https://api.torbox.app/v1/api/torrents"
         if "Torbox" in self.bot.conf:
-            self.apikey = self.bot.conf["Torbox"]["apikey"]
-            self.noauth_hd = {"Authorization": f"Bearer {self.apikey}",
-                              "Apikey": self.apikey}
+            self.db_api_key = self.bot.conf["Torbox"]["apikey"]
+            self.hd_db_noauth = {"Authorization": f"Bearer {self.db_api_key}",
+                                 "Apikey": self.db_api_key}
         else:
             self.bot.log("Supabase API key not configured")
             exit(1)  # prankd
@@ -36,15 +61,9 @@ class Loop(commands.Cog):
             self.save_state()
 
     @property
-    def auth_headers(self):
+    def hd_db_authed(self):
         return {"Authorization": f"Bearer {self.token}",
-                "Apikey": self.apikey}
-
-    def save_state(self):
-        with open("cogs/torbox/info.json", 'w') as f:
-            json.dump({"watched": self.watched,
-                       "token": self.token,
-                       "refresh_token": self.refresh_token}, f)
+                "Apikey": self.db_api_key}
 
     @staticmethod
     def fmt_speed(speed: int) -> str:
@@ -55,32 +74,39 @@ class Loop(commands.Cog):
         else:
             return f"{speed}B/s"
 
+    def save_state(self):
+        with open("cogs/torbox/info.json", 'w') as f:
+            json.dump({"watched": self.watched,
+                       "token": self.token,
+                       "refresh_token": self.refresh_token}, f)
+
     async def send_torrent(self, ctx, data):
         embed = discord.Embed(title=f"{data['name']}")
-        state = data["download_state"]
+        state = TorrentState(data["download_state"])
         embed.description = f"State: {state}\n"
-        if state in ["downloading"]:
+        if state.downloading:
             embed.description += f"Download speed: {self.fmt_speed(data['download_speed'])}\n"
-        if state not in ["paused"]:
-            embed.description += f"Upload speed: {self.fmt_speed(data['upload_speed'])}\n" \
-                                 f"Seeds: {data['seeds']}\nPeers: {data['peers']}\n"
-        if state not in ["Completed"]:
+        if state.uploading:
+            embed.description += f"Upload speed: {self.fmt_speed(data['upload_speed'])}\n"
+        if state.downloading:
+            embed.description += f"Seeds: {data['seeds']}\nPeers: {data['peers']}\n"
+        if not state.completed:
             embed.description += f"Progress: {data['progress'] * 100:.0f}%\n"
-        if state not in ["Completed", "paused", "uploading"]:
+        if state.in_progress:
             embed.description += f"ETA: {timedelta(seconds=data['eta'])}"
-        if state == "uploading":
+        if state.download_available:
             embed.description += f"Download link expiry: {timedelta(seconds=data['eta'])}\n"
             embed.description += await self.get_dl_link(data["name"], "all")
         await ctx.send(embed=embed)
 
-    async def refresh_auth(self):
+    async def refresh_db_auth(self):
         if not self.refresh_token or not self.token:
             await self.bot.log("Token refresh failed (token or refresh token missing)")
             return 1
         async with aiohttp.ClientSession() as s:
             r = await s.post(f"{self.auth_url}/token?grant_type=refresh_token",
                              data=json.dumps({"refresh_token": self.refresh_token}),
-                             headers=self.noauth_hd)
+                             headers=self.hd_db_noauth)
             if r.status != 200:
                 self.bot.log(f"Token refresh failed! (status code {r.status})")
                 return
@@ -89,43 +115,23 @@ class Loop(commands.Cog):
             self.refresh_token = j["refresh_token"]
             self.save_state()
 
-    @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
-    async def torbox_get_otp(self, ctx, email):
-        if not self.apikey:
-            return await ctx.send("API key not provided")
+    async def get_api_headers(self, auth_id) -> dict[str:str]:
         async with aiohttp.ClientSession() as s:
-            r = await s.post(f"{self.auth_url}/otp",
-                             data=json.dumps({"email": email}),
-                             headers=self.noauth_hd)
+            r = await s.get(f"{self.db_url}/api_tokens?select=token&auth_id=eq.{auth_id}",
+                            headers=self.hd_db_authed)
+            r = await r.json()
             if r.status != 200:
-                await ctx.send("Failed to send email")
-                print(await r.json())
-            else:
-                await ctx.send("Magic link sent successfully, check your email "
-                               "and use `torbox_get_token` with the magic link")
-
-    @commands.command(aliases=["tr_get_token"])
-    async def torbox_get_token(self, ctx, link):
-        # if you try using the raw link you actually get cucked by the discord embed crawler
-        # it will get the link to try and generate an embed preview which also then invalidates it
-        # so an alternate solution is required
-        # either send the link through a different channel (like stdin)
-        # or put <> around the link to stop discord trying to embed it
-        async with aiohttp.ClientSession() as s:
-            r = await s.get(link, allow_redirects=False)
-            print(await r.content.read())
-            url = r.headers["Location"]
-            r = await s.get(url, allow_redirects=False)
-            await r.content.read()
-            # if 
-            return
+                return {"failed": "true"}
+            headers = {"Authorization": f"Bearer {r[0]['token']}",
+                       "Content-Type": "application/json"}
+            return headers
 
     async def fuzzy_torrent_by_name(self, ctx, name):
-        if await self.refresh_auth():
+        if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=name&name=ilike.%{name}%",
-                            headers=self.auth_headers)
+                            headers=self.hd_db_authed)
             if r.status != 200:
                 self.bot.log(f"GET torrents returned {r.status}")
                 return await ctx.send("Failed to fetch torrent information")
@@ -140,21 +146,85 @@ class Loop(commands.Cog):
                 return r[0]["name"]
 
     async def main(self, channel):
-        if await self.refresh_auth():
+        if await self.refresh_db_auth():
             return await channel.send("Authentication failed, reconfigure token")
         async with aiohttp.ClientSession() as s:
             for name in self.watched:
                 r = await s.get(f"{self.db_url}/torrents?select=download_speed,upload_speed,"
                                 f"eta,download_state,progress,seeds,peers,name"
-                                f"&name=eq.{name}", headers=self.auth_headers)
+                                f"&name=eq.{name}", headers=self.hd_db_authed)
                 if r.status != 200:
                     self.bot.log(f"GET torrents returned {r.status}")
                 r = await r.json()
                 await self.send_torrent(channel, r[0])
 
+    async def get_dl_link(self, fullname, mode, arg=None):
+        if await self.refresh_db_auth():
+            return "Authentication failure"
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{self.db_url}/torrents?select=id,download_path,files,server,download_present,servers(download_url)"
+                            f"&name=eq.{fullname}",
+                            headers=self.hd_db_authed)
+            if r.status != 200:
+                return "Failed to fetch torrent information"
+            r = await r.json()
+            data = r[0]
+            if data["download_present"]:
+                # server_url = data["servers"]["download_url"]
+                root_id = data["download_path"]
+            else:
+                self.bot.log(f"{fullname}: download link not present")
+                return "N/A"
+
+            headers = self.get_api_headers(data["auth_id"])
+            if "failed" in headers:
+                return "Failed to fetch API token"
+
+            if mode == "all":
+                r = await s.get(f"{self.api_url}/requestzip?torrent_id={data['id']}&"
+                                f"folder_id={root_id}&token={headers['Authorization'][7:]}")
+                link = await r.json()
+                return link["data"]
+            if mode == "dir":
+                pass  # todo
+            elif mode == "file":
+                pass  # todo
+
+    @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
+    async def torbox_get_otp(self, ctx, email):
+        if not self.db_api_key:
+            return await ctx.send("API key not provided")
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(f"{self.auth_url}/otp",
+                             data=json.dumps({"email": email}),
+                             headers=self.hd_db_noauth)
+            if r.status != 200:
+                await ctx.send("Failed to send email")
+                print(await r.json())
+            else:
+                await ctx.send("Magic link sent successfully, check your email "
+                               "and use `torbox_get_token` with the magic link")
+
+    @commands.command(aliases=["tr_get_token"])
+    async def torbox_get_token(self, ctx):#, link):
+        # passing link as a command arg means you get sniped by the embed crawler
+        # you'd need to wrap it in <> or `` to prevent embeds
+        link = input()
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(link, allow_redirects=False)
+            print(await r.content.read())
+            url = r.headers["Location"]
+            r = await s.get(url, allow_redirects=False)
+            cookies = [v for k, v in r.headers.items() if k == "Set-Cookie"]
+            cookies.sort()  # just in case
+            self.token = cookies[0].split(';')[0].split('=')[1]
+            self.refresh_token = cookies[1].split(';')[0].split('=')[1]
+            await self.refresh_db_auth()
+            return await ctx.send("Successfully grabbed token")
+
     @commands.command(aliases=["tr_status"])
     async def torbox_status(self, ctx, name):
-        if await self.refresh_auth():
+        if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         name = await self.fuzzy_torrent_by_name(ctx, name)
         if not isinstance(name, str):
@@ -162,7 +232,7 @@ class Loop(commands.Cog):
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=download_speed,upload_speed,eta,download_state,"
                             f"progress,seeds,peers,name"
-                            f"&name=eq.{name}", headers=self.auth_headers)
+                            f"&name=eq.{name}", headers=self.hd_db_authed)
             if r.status != 200:
                 self.bot.log(f"GET torrents returned {r.status}")
                 return await ctx.send("Failed to fetch torrent information")
@@ -172,7 +242,7 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_watch", "tr_unwatch", "torbox_unwatch"])
     async def torbox_watch(self, ctx, name):
-        if await self.refresh_auth():
+        if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         name = await self.fuzzy_torrent_by_name(ctx, name)
         if not isinstance(name, str):
@@ -187,68 +257,35 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_pause", "tr_resume", "torbox_resume"])
     async def torbox_pause(self, ctx, name):
-        if await self.refresh_auth():
-            return await ctx.send("Authentication failed, reconfigure token")
+        if await self.refresh_db_auth():
+            return await ctx.send("Authentication failed, reconfigure token using "
+                                  "`torbox_get_link` and `torbox_get_token`")
         name = await self.fuzzy_torrent_by_name(ctx, name)
         if not isinstance(name, str):
             return
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=id,auth_id,download_state&name=eq.{name}",
-                            headers=self.auth_headers)
+                            headers=self.hd_db_authed)
             data = await r.json()
             data = data[0]
-            if data["download_state"] == "paused":
-                action = "resume"
-            else:
+            if data["download_state"] != "paused":
                 action = "pause"
-            headers = self.auth_headers
-            headers["Content-Type"] = "application/json"
-            r = await s.post(self.control_url,
-                             data=json.dumps({"id_": data["id"],
-                                              "auth_id": data["auth_id"],
+            else:
+                action = "resume"
+
+            headers = self.get_api_headers(data["auth_id"])
+            if "failed" in headers:
+                return await ctx.send(f"Failed to fetch API token")
+            r = await s.post(self.api_url,
+                             data=json.dumps({"torrent_id": data["id"],
                                               "operation": action}),
                              headers=headers)
             r = await r.json()
-            if r["status"] is True:
+
+            if "success" in r["detail"]:
                 await ctx.send(f"{name} {'paused' if action == 'pause' else 'resumed'} succesfully")
             else:
                 await ctx.send(f"Failed to {action} {name}")
-
-    async def get_dl_link(self, fullname, mode, arg=None):
-        if await self.refresh_auth():
-            return #await ctx.send("Authentication failed, reconfigure token")
-        async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/torrents?select=id,download_path,files,server,download_present,servers(download_url)"
-                            f"&name=eq.{fullname}",
-                            headers=self.auth_headers)
-            if r.status != 200:
-                return "Failed to fetch torrent information"
-            r = await r.json()
-            data = r[0]
-            if data["download_present"]:
-                server_url = data["servers"]["download_url"]
-            else:
-                # check if this is needed (its possible it sets download_present)
-                # but it might also be that asking /servers directly is unnecessary and the above query
-                # will set download_present if it's not already true
-                server_id = data["server"]
-                r = await s.get(f"{self.db_url}/servers?select=download_url&id=eq.{server_id}",
-                                headers=self.auth_headers)
-                server_url = await r.json()
-                server_url = server_url["download_url"]
-
-            if mode == "all":
-                mode = "dir"
-                arg = data["download_path"].split('/')[2]
-            if mode == "dir":
-                b64dir = base64.urlsafe_b64encode(arg.encode("UTF-8")).decode("UTF-8")
-                return (f"{server_url}/zip/torrents/{data['id']}"
-                        f"?d={b64dir}&token={self.token}")
-            elif mode == "file":
-                pass  # todo
-                # if you're wondering the way to do it is
-                # GET <server_url>/file/torrents/<data['id']>/<file_idx>
-                # i just dont feel like writing a file search to get the index
 
 
 def setup(bot):
