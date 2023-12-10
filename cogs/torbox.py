@@ -1,6 +1,7 @@
 import base64
 import json
 import os.path
+from typing import *
 
 import discord
 from discord.ext import commands
@@ -21,11 +22,12 @@ class TorrentState:
 
     @property
     def uploading(self):
-        return self.state not in ["paused", "Completed", "stalledUP"]
+        # not sure about that last one
+        return self.state not in ["paused", "Completed", "stalledUP", "processing"]
 
     @property
     def completed(self):
-        return self.state not in ["Completed", "uploading", "stalledUP"]
+        return self.state in ["Completed", "uploading", "stalledUP"]
 
     @property
     def in_progress(self):
@@ -38,7 +40,14 @@ class TorrentState:
 
 class Loop(commands.Cog):
     """Torbox client
-    Requires supabase api key (not unique) in frii_update.ini [Torbox]"""
+    frii_update.ini:  [Torbox]
+                      apikey (str) = None : general supabase api key, is sent in the `Apikey header on requests to db.torbox.app
+                      autosoc (bool) = True : whether to automatically stop watching torrents after they finish
+    info.json ideally shouldn't be configured manually but if you must:
+    dict["watched": list[str]  # list of *full* names of torrents to watch
+         "token": str          # personalised supabase token
+         "refresh_token": str  # refresh token
+        ]"""
     def __init__(self, bot):
         self.bot = bot
         self.auth_url = "https://db.torbox.app/auth/v1"
@@ -58,9 +67,9 @@ class Loop(commands.Cog):
         if os.path.exists("cogs/torbox/info.json"):
             with open("cogs/torbox/info.json", 'r') as f:
                 data = json.load(f)
-                self.watched = data["watched"]
-                self.token = data["token"]
-                self.refresh_token = data["refresh_token"]
+                self.watched: list[str] = data["watched"]
+                self.token: str = data["token"]
+                self.refresh_token: str = data["refresh_token"]
         else:
             os.mkdir("cogs/torbox")
             self.save_state()
@@ -85,7 +94,7 @@ class Loop(commands.Cog):
                        "token": self.token,
                        "refresh_token": self.refresh_token}, f)
 
-    async def send_torrent(self, ctx, data):
+    async def send_torrent(self, ctx, data: dict):
         embed = discord.Embed(title=f"{data['name']}")
         state = TorrentState(data["download_state"])
         embed.description = f"State: {state}\n"
@@ -101,7 +110,7 @@ class Loop(commands.Cog):
             embed.description += f"ETA: {timedelta(seconds=data['eta'])}"
         if state.download_available:
             embed.description += f"Download link expiry: {timedelta(seconds=data['eta'])}\n"
-            embed.description += await self.get_dl_link(data["name"], "all")
+            embed.description += f"Download link: {await self.get_dl_link(data['name'], 'all')}"
         await ctx.send(embed=embed)
 
     async def refresh_db_auth(self):
@@ -159,15 +168,24 @@ class Loop(commands.Cog):
             return await channel.send("Authentication failed, reconfigure token")
         async with aiohttp.ClientSession() as s:
             for name in self.watched:
+                self.bot.log(f"Checkikng: {name}")
                 r = await s.get(f"{self.db_url}/torrents?select=download_speed,upload_speed,"
                                 f"eta,download_state,progress,seeds,peers,name"
                                 f"&name=eq.{name}", headers=self.hd_db_authed)
                 if r.status != 200:
                     self.bot.log(f"GET torrents returned {r.status}")
                 r = await r.json()
+                if len(r) == 0:
+                    self.bot.log(f"Torrent {name} not found, removing")
+                    self.watched.remove(name)
+                    self.save_state()
+                    continue
                 await self.send_torrent(channel, r[0])
+                if self.bot.conf["Torbox"]["autosoc"] and TorrentState(r[0]["download_state"]).completed:
+                    self.watched.remove(name)
+                    self.save_state()
 
-    async def get_dl_link(self, fullname, mode, arg=None):
+    async def get_dl_link(self, fullname, mode: LiteralString, arg=None):
         if await self.refresh_db_auth():
             return "Authentication failure"
         async with aiohttp.ClientSession() as s:
@@ -185,7 +203,7 @@ class Loop(commands.Cog):
                 self.bot.log(f"{fullname}: download link not present")
                 return "N/A"
 
-            headers = self.get_api_headers()
+            headers = await self.get_api_headers()
             if "failed" in headers:
                 return "Failed to fetch API token"
 
