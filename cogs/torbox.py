@@ -37,6 +37,8 @@ class TorrentState:
 
 
 class Loop(commands.Cog):
+    """Torbox client
+    Requires supabase api key (not unique) in frii_update.ini [Torbox]"""
     def __init__(self, bot):
         self.bot = bot
         self.auth_url = "https://db.torbox.app/auth/v1"
@@ -48,7 +50,7 @@ class Loop(commands.Cog):
                                  "Apikey": self.db_api_key}
         else:
             self.bot.log("Supabase API key not configured")
-            exit(1)  # prankd
+            return
 
         self.watched = []
         self.token = ''
@@ -118,9 +120,13 @@ class Loop(commands.Cog):
             self.refresh_token = j["refresh_token"]
             self.save_state()
 
-    async def get_api_headers(self, auth_id) -> dict[str:str]:
+    async def get_api_headers(self) -> dict[str:str]:
         async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/api_tokens?select=token&auth_id=eq.{auth_id}",
+            r = await s.get(f"{self.db_url}/users?select=auth_id", headers=self.hd_db_authed)
+            if r.status != 200:
+                return {"failed": "failed to get auth id"}
+            r = await r.json()
+            r = await s.get(f"{self.db_url}/api_tokens?select=token&auth_id=eq.{r[0]['auth_id']}",
                             headers=self.hd_db_authed)
             if r.status != 200:
                 return {"failed": "true"}
@@ -179,7 +185,7 @@ class Loop(commands.Cog):
                 self.bot.log(f"{fullname}: download link not present")
                 return "N/A"
 
-            headers = self.get_api_headers(data["auth_id"])
+            headers = self.get_api_headers()
             if "failed" in headers:
                 return "Failed to fetch API token"
 
@@ -193,23 +199,37 @@ class Loop(commands.Cog):
             elif mode == "file":
                 pass  # todo
 
-    @commands.command(alias="tr_add_magnet")
-    async def torbox_add_magnet(self, ctx, magnet):
+    @commands.command(aliases=["tr_add_magnet", "tr_add_torrent", "torbox_add_torrent"])
+    async def torbox_add_magnet(self, ctx, magnet=None):
+        """Usage: `torbox_add_magnet link`  /  `torbox_add_torrent file`
+        link (str): magnet link for the torrent to add
+        file (.torrent file): .torrent file for the torrent to add"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
+        files = ctx.message.attachments
+        if len(files) == 0 and magnet is None:
+            return await ctx.send("Either a torrent file or magnet link must be provided")
+        else:
+            torrent_bytes = await files[0].read()
         async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/users?select=auth_id", headers=self.hd_db_authed)
-            r = await r.json()
-            headers = await self.get_api_headers(r[0]["auth_id"])
+            headers = await self.get_api_headers()
             headers.pop("Content-Type")
-            r = await s.post(f"{self.api_url}/createtorrent",
-                             data={"magnet": magnet},
-                             headers=headers)
+            if magnet:
+                r = await s.post(f"{self.api_url}/createtorrent",
+                                 data={"magnet": magnet},
+                                 headers=headers)
+            else:
+                # todo i cant check this because it doesnt work in browser fsr
+                # r = await s.post(f"{self.api_url}/createtorrent",
+                #                  data=torrent_bytes,
+                #                  headers=headers)
+                return await ctx.send("Not implemented")
             j = await r.json()
             return await ctx.send(j["detail"])
 
-    @commands.command(aliases=["tr_list_torrents"])
+    @commands.command(aliases=["tr_list_torrents", "tr_list", "torbox_list"])
     async def torbox_list_torrents(self, ctx):
+        """Usage: `torbox_list_torrents`"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         async with aiohttp.ClientSession() as s:
@@ -226,6 +246,9 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
     async def torbox_get_otp(self, ctx, email, create_user=False):
+        """Usage: `torbox_get_otp email <optional create_user>`
+        email (str): email address to send log-in link to
+        create_user (bool): if True, creates an account for the specified email address"""
         if not self.db_api_key:
             return await ctx.send("API key not provided")
         async with aiohttp.ClientSession() as s:
@@ -237,13 +260,21 @@ class Loop(commands.Cog):
                 print(await r.json())
             else:
                 await ctx.send("Magic link sent successfully, check your email "
-                               "and use `torbox_get_token` with the magic link")
+                               "and use `torbox_get_token` with the login link")
 
     @commands.command(aliases=["tr_get_token"])
-    async def torbox_get_token(self, ctx):#, link):
-        # passing link as a command arg means you get sniped by the embed crawler
-        # you'd need to wrap it in <> or `` to prevent embeds
-        link = input()
+    async def torbox_get_token(self, ctx, link=None):
+        """Usage: `torbox_get_token <optional link>`
+        link (str): login link from torbox email. If not specified, will wait for the link to be entered
+        via standard input.
+        **Important**
+        If providing the link as a command parameter, you must wrap the link in <angle brackets> like so.
+        Otherwise, this process will not work."""  # reason being the embed crawler snipes you
+        if link is None:
+            await ctx.send("No link provided, waiting for stdin")
+            link = input("Enter login link: ")
+        else:
+            link = link.rstrip('>').lstrip('<')
         async with aiohttp.ClientSession() as s:
             r = await s.get(link, allow_redirects=False)
             print(await r.content.read())
@@ -258,6 +289,9 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_status"])
     async def torbox_status(self, ctx, name):
+        """Usage: `torbox_status torrent_name`
+        torrent_name (str): name of torrent to display status for.
+        Case insensitive, does not need to be the full name"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         name = await self.fuzzy_torrent_by_name(ctx, name)
@@ -276,6 +310,9 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_watch", "tr_unwatch", "torbox_unwatch"])
     async def torbox_watch(self, ctx, name):
+        """Usage: `torbox_watch torrent_name`  /  `torbox_unwatch torrent_name`
+        torrent_name (str): name of torrent to watch/unwatch.
+        Case insensitive, does not need to be the full name"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         name = await self.fuzzy_torrent_by_name(ctx, name)
@@ -291,6 +328,9 @@ class Loop(commands.Cog):
 
     @commands.command(aliases=["tr_pause", "tr_resume", "torbox_resume"])
     async def torbox_pause(self, ctx, name):
+        """Usage: `torbox_pause torrent_name`  /  `torbox_resume torrent_name`
+        torrent_name (str): name of torrent to pause/resume.
+        Case insensitive, does not need to be the full name"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token using "
                                   "`torbox_get_link` and `torbox_get_token`")
@@ -307,10 +347,10 @@ class Loop(commands.Cog):
             else:
                 action = "resume"
 
-            headers = self.get_api_headers(data["auth_id"])
+            headers = await self.get_api_headers()
             if "failed" in headers:
                 return await ctx.send(f"Failed to fetch API token")
-            r = await s.post(self.api_url,
+            r = await s.post(f"{self.api_url}/controltorrent",
                              data=json.dumps({"torrent_id": data["id"],
                                               "operation": action}),
                              headers=headers)
