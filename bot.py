@@ -63,7 +63,11 @@ for cog in os.listdir("cogs"):
 
 intents = Intents.none()
 intents.messages = True
-bot = FriiUpdate(command_prefix=".", intents=intents)
+if "prefix" not in config["Bot"]:
+    config["Bot"]["prefix"] = '.'
+    with open("frii_update.ini", 'w') as f:
+        config.write(f)
+bot = FriiUpdate(command_prefix=config["Bot"]["prefix"], intents=intents)
 
 
 @bot.command()
@@ -122,7 +126,7 @@ async def interval(ctx, time):
     except ValueError:
         await ctx.send("Interval must be an integer")
         return
-    bot.time = int(time)
+    bot.interval = int(time)
     await ctx.send(f"Interval set to {time} seconds")
 
 bot.log("Connecting...")
