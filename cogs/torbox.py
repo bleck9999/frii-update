@@ -115,7 +115,7 @@ class Loop(commands.Cog):
 
     async def refresh_db_auth(self):
         if not self.refresh_token or not self.token:
-            await self.bot.log("Token refresh failed (token or refresh token missing)")
+            self.bot.log("Token refresh failed (token or refresh token missing)")
             return 1
         async with aiohttp.ClientSession() as s:
             r = await s.post(f"{self.auth_url}/token?grant_type=refresh_token",
@@ -165,7 +165,9 @@ class Loop(commands.Cog):
 
     async def main(self, channel):
         if await self.refresh_db_auth():
-            return await channel.send("Authentication failed, reconfigure token")
+            if self.watched:
+                await channel.send("Authentication failed, reconfigure token")
+            return
         async with aiohttp.ClientSession() as s:
             for name in self.watched:
                 self.bot.log(f"Checkikng: {name}")
