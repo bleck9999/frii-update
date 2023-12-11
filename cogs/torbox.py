@@ -122,8 +122,8 @@ class Loop(commands.Cog):
                              data=json.dumps({"refresh_token": self.refresh_token}),
                              headers=self.hd_db_noauth)
             if r.status != 200:
-                self.bot.log(f"Token refresh failed! (status code {r.status})")
-                return
+                self.bot.log(f"Token refresh failed! {r.status} - {await r.json()}")
+                return 2
             j = await r.json()
             self.token = j["access_token"]
             self.refresh_token = j["refresh_token"]
@@ -138,7 +138,7 @@ class Loop(commands.Cog):
             r = await s.get(f"{self.db_url}/api_tokens?select=token&auth_id=eq.{r[0]['auth_id']}",
                             headers=self.hd_db_authed)
             if r.status != 200:
-                return {"failed": "true"}
+                return {"failed": "failed to get token"}
             r = await r.json()
             headers = {"Authorization": f"Bearer {r[0]['token']}",
                        "Content-Type": "application/json"}
@@ -151,7 +151,7 @@ class Loop(commands.Cog):
             r = await s.get(f"{self.db_url}/torrents?select=name&name=ilike.%{name}%",
                             headers=self.hd_db_authed)
             if r.status != 200:
-                self.bot.log(f"GET torrents returned {r.status}")
+                self.bot.log(f"GET torrents returned {r.status} - {await r.json()}")
                 return await ctx.send("Failed to fetch torrent information")
             r = await r.json()
             if len(r) > 1:
@@ -175,7 +175,7 @@ class Loop(commands.Cog):
                                 f"eta,download_state,progress,seeds,peers,name"
                                 f"&name=eq.{name}", headers=self.hd_db_authed)
                 if r.status != 200:
-                    self.bot.log(f"GET torrents returned {r.status}")
+                    self.bot.log(f"GET torrents returned {r.status} - {await r.json()}")
                 r = await r.json()
                 if len(r) == 0:
                     self.bot.log(f"Torrent {name} not found, removing")
@@ -195,6 +195,7 @@ class Loop(commands.Cog):
                             f"&name=eq.{fullname}",
                             headers=self.hd_db_authed)
             if r.status != 200:
+                self.bot.log(f"get_dl_link returned {r.status} - {await r.json()}")
                 return "Failed to fetch torrent information"
             r = await r.json()
             data = r[0]
@@ -277,7 +278,6 @@ class Loop(commands.Cog):
                              headers=self.hd_db_noauth)
             if r.status != 200:
                 await ctx.send("Failed to send email")
-                print(await r.json())
             else:
                 await ctx.send("Magic link sent successfully, check your email "
                                "and use `torbox_get_token` with the login link")
@@ -297,7 +297,6 @@ class Loop(commands.Cog):
             link = link.rstrip('>').lstrip('<')
         async with aiohttp.ClientSession() as s:
             r = await s.get(link, allow_redirects=False)
-            print(await r.content.read())
             url = r.headers["Location"]
             r = await s.get(url, allow_redirects=False)
             cookies = [v for k, v in r.headers.items() if k == "Set-Cookie"]
@@ -322,7 +321,7 @@ class Loop(commands.Cog):
                             f"progress,seeds,peers,name"
                             f"&name=eq.{name}", headers=self.hd_db_authed)
             if r.status != 200:
-                self.bot.log(f"GET torrents returned {r.status}")
+                self.bot.log(f"GET torrents returned {r.status} - {await r.json()}")
                 return await ctx.send("Failed to fetch torrent information")
             r = await r.json()
             data = r[0]
