@@ -6,7 +6,7 @@ from typing import *
 import discord
 from discord.ext import commands
 import aiohttp
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 
 class TorrentState:
@@ -114,6 +114,16 @@ class Loop(commands.Cog):
         await ctx.send(embed=embed)
 
     async def refresh_db_auth(self):
+        with open("cogs/torbox/info.json", 'r') as f:
+            stored = json.load(f)
+        stored_iat = base64.b64decode(stored["token"].split('.')[1])
+        stored_iat = json.loads(str(stored_iat, "UTF-8"))["iat"]
+        current_iat = base64.b64decode(self.token.split('.')[1])
+        current_iat = json.loads(str(current_iat, "UTF-8"))["iat"]
+        if datetime.fromtimestamp(stored_iat) > datetime.fromtimestamp(current_iat):
+            self.token = stored["token"]
+            self.refresh_token = stored["refresh_token"]
+
         if not self.refresh_token or not self.token:
             self.bot.log("Token refresh failed (token or refresh token missing)")
             return 1
@@ -128,6 +138,7 @@ class Loop(commands.Cog):
             self.token = j["access_token"]
             self.refresh_token = j["refresh_token"]
             self.save_state()
+            return 0
 
     async def get_api_headers(self) -> dict[str:str]:
         async with aiohttp.ClientSession() as s:
