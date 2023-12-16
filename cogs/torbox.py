@@ -241,7 +241,7 @@ class Loop(commands.Cog):
         files = ctx.message.attachments
         if len(files) == 0 and magnet is None:
             return await ctx.send("Either a torrent file or magnet link must be provided")
-        else:
+        elif magnet is None:
             torrent_bytes = await files[0].read()
         async with aiohttp.ClientSession() as s:
             headers = await self.get_api_headers()
