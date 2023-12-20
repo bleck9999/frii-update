@@ -17,21 +17,25 @@ class TorrentState:
         return self.state
 
     @property
-    def downloading(self):
+    def dl_speed(self):
         return self.state in ["downloading"]
 
     @property
-    def uploading(self):
-        # not sure about that last one
-        return self.state not in ["paused", "Completed", "stalledUP", "processing"]
+    def seeds(self):
+        return self.state in ["downloading"]
 
     @property
-    def completed(self):
+    def up_speed(self):
+        # not sure about that last one
+        return self.state not in ["paused", "metaDL", "Completed", "stalledUP", "processing"]
+
+    @property
+    def progress(self):
         return self.state in ["Completed", "uploading", "stalledUP"]
 
     @property
-    def in_progress(self):
-        return self.state not in ["Completed", "paused", "uploading", "stalledUP"]
+    def eta(self):
+        return self.state not in ["Completed", "paused", "uploading", "stalledUP", "processing"]
 
     @property
     def download_available(self):
@@ -98,15 +102,15 @@ class Loop(commands.Cog):
         embed = discord.Embed(title=f"{data['name']}")
         state = TorrentState(data["download_state"])
         embed.description = f"State: {state}\n"
-        if state.downloading:
+        if state.dl_speed:
             embed.description += f"Download speed: {self.fmt_speed(data['download_speed'])}\n"
-        if state.uploading:
+        if state.up_speed:
             embed.description += f"Upload speed: {self.fmt_speed(data['upload_speed'])}\n"
-        if state.downloading:
+        if state.seeds:
             embed.description += f"Seeds: {data['seeds']}\nPeers: {data['peers']}\n"
-        if not state.completed:
+        if not state.progress:
             embed.description += f"Progress: {data['progress'] * 100:.0f}%\n"
-        if state.in_progress:
+        if state.eta:
             embed.description += f"ETA: {timedelta(seconds=data['eta'])}"
         if state.download_available:
             embed.description += f"Download link expiry: {timedelta(seconds=data['eta'])}\n"
@@ -194,7 +198,7 @@ class Loop(commands.Cog):
                     self.save_state()
                     continue
                 await self.send_torrent(channel, r[0])
-                if self.bot.conf["Torbox"]["autosoc"] and TorrentState(r[0]["download_state"]).completed:
+                if self.bot.conf["Torbox"]["autosoc"] and TorrentState(r[0]["download_state"]).progress:
                     self.watched.remove(name)
                     self.save_state()
 
@@ -246,16 +250,17 @@ class Loop(commands.Cog):
         async with aiohttp.ClientSession() as s:
             headers = await self.get_api_headers()
             headers.pop("Content-Type")
-            if magnet:
+            if magnet is None:
+                form_data = aiohttp.FormData()
+                form_data.add_field("file", torrent_bytes, filename=files[0].filename,
+                                    content_type="application/x-bittorrent")
+                r = await s.post(f"{self.api_url}/createtorrent",
+                                 data=form_data,
+                                 headers=headers)
+            else:
                 r = await s.post(f"{self.api_url}/createtorrent",
                                  data={"magnet": magnet},
                                  headers=headers)
-            else:
-                # todo i cant check this because it doesnt work in browser fsr
-                # r = await s.post(f"{self.api_url}/createtorrent",
-                #                  data=torrent_bytes,
-                #                  headers=headers)
-                return await ctx.send("Not implemented")
             j = await r.json()
             return await ctx.send(j["detail"])
 
