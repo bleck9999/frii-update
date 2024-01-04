@@ -10,8 +10,9 @@ from datetime import timedelta, datetime
 
 
 class TorrentState:
-    def __init__(self, state: str):
-        self.state = state
+    def __init__(self, torrent: dict[str, Any]):
+        self.state = torrent["download_state"]
+        self._data = torrent
 
     def __repr__(self):
         return self.state
@@ -39,7 +40,7 @@ class TorrentState:
 
     @property
     def download_available(self):
-        return self.state in ["uploading", "stalledUP"]
+        return self._data["download_present"]
 
 
 class Loop(commands.Cog):
@@ -100,7 +101,7 @@ class Loop(commands.Cog):
 
     async def send_torrent(self, ctx, data: dict):
         embed = discord.Embed(title=f"{data['name']}")
-        state = TorrentState(data["download_state"])
+        state = TorrentState(data)
         embed.description = f"State: {state}\n"
         if state.dl_speed:
             embed.description += f"Download speed: {self.fmt_speed(data['download_speed'])}\n"
@@ -114,7 +115,7 @@ class Loop(commands.Cog):
             embed.description += f"ETA: {timedelta(seconds=data['eta'])}"
         if state.download_available:
             embed.description += f"Download link expiry: {timedelta(seconds=data['eta'])}\n"
-            embed.description += f"Download link: {await self.get_dl_link(data['name'], 'all')}"
+            embed.description += f"Download link: {await self.get_dl_link(data['id'], 'all')}"
         await ctx.send(embed=embed)
 
     async def refresh_db_auth(self):
@@ -163,7 +164,7 @@ class Loop(commands.Cog):
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/torrents?select=name&name=ilike.%{name}%",
+            r = await s.get(f"{self.db_url}/torrents?select=name,id&name=ilike.%{name}%",
                             headers=self.hd_db_authed)
             if r.status != 200:
                 self.bot.log(f"GET torrents returned {r.status} - {await r.json()}")
@@ -176,7 +177,7 @@ class Loop(commands.Cog):
             elif len(r) == 0:
                 await ctx.send(f"No torrents found matching {name}")
             else:
-                return r[0]["name"]
+                return r[0]["id"]
 
     async def main(self, channel):
         if await self.refresh_db_auth():
@@ -202,12 +203,12 @@ class Loop(commands.Cog):
                     self.watched.remove(name)
                     self.save_state()
 
-    async def get_dl_link(self, fullname, mode: LiteralString, arg=None):
+    async def get_dl_link(self, tor_id, mode: LiteralString, arg=None):
         if await self.refresh_db_auth():
             return "Authentication failure"
         async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/torrents?select=id,download_path,files,server,download_present,servers(download_url)"
-                            f"&name=eq.{fullname}",
+            r = await s.get(f'{self.db_url}/torrents?select=id,download_path,files,server,download_present'
+                            f'&id=eq.{tor_id}',
                             headers=self.hd_db_authed)
             if r.status != 200:
                 self.bot.log(f"get_dl_link returned {r.status} - {await r.json()}")
@@ -218,7 +219,7 @@ class Loop(commands.Cog):
                 # server_url = data["servers"]["download_url"]
                 root_id = data["download_path"]
             else:
-                self.bot.log(f"{fullname}: download link not present")
+                self.bot.log(f"{tor_id}: download link not present")
                 return "N/A"
 
             headers = await self.get_api_headers()
@@ -235,7 +236,7 @@ class Loop(commands.Cog):
             elif mode == "file":
                 pass  # todo
 
-    @commands.command(aliases=["tr_add_magnet", "tr_add_torrent", "torbox_add_torrent"])
+    @commands.command(aliases=["tr_add", "torbox_add", "tr_add_magnet", "tr_add_torrent", "torbox_add_torrent"])
     async def torbox_add_magnet(self, ctx, magnet=None):
         """Usage: `torbox_add_magnet link`  /  `torbox_add_torrent file`
         link (str): magnet link for the torrent to add
@@ -329,13 +330,13 @@ class Loop(commands.Cog):
         Case insensitive, does not need to be the full name"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
-        name = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(name, str):
+        tor_id = await self.fuzzy_torrent_by_name(ctx, name)
+        if not isinstance(tor_id, str):
             return
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=download_speed,upload_speed,eta,download_state,"
                             f"progress,seeds,peers,name"
-                            f"&name=eq.{name}", headers=self.hd_db_authed)
+                            f"&id=eq.{tor_id}", headers=self.hd_db_authed)
             if r.status != 200:
                 self.bot.log(f"GET torrents returned {r.status} - {await r.json()}")
                 return await ctx.send("Failed to fetch torrent information")
@@ -350,15 +351,15 @@ class Loop(commands.Cog):
         Case insensitive, does not need to be the full name"""
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
-        name = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(name, str):
+        tor_id = await self.fuzzy_torrent_by_name(ctx, name)
+        if not isinstance(tor_id, str):
             return
-        if name in self.watched:
-            self.watched.remove(name)
-            await ctx.send(f"Stopped watching {name}")
+        if tor_id in self.watched:
+            self.watched.remove(tor_id)
+            await ctx.send(f"Stopped watching {tor_id}")
         else:
-            self.watched.append(name)
-            await ctx.send(f"Now watching {name}")
+            self.watched.append(tor_id)
+            await ctx.send(f"Now watching {tor_id}")
         self.save_state()
 
     @commands.command(aliases=["tr_pause", "tr_resume", "torbox_resume"])
@@ -369,14 +370,15 @@ class Loop(commands.Cog):
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token using "
                                   "`torbox_get_link` and `torbox_get_token`")
-        name = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(name, str):
+        tor_id = await self.fuzzy_torrent_by_name(ctx, name)
+        if not isinstance(tor_id, str):
             return
         async with aiohttp.ClientSession() as s:
-            r = await s.get(f"{self.db_url}/torrents?select=id,auth_id,download_state&name=eq.{name}",
+            r = await s.get(f"{self.db_url}/torrents?select=name,id,auth_id,download_state&id=eq.{tor_id}",
                             headers=self.hd_db_authed)
             data = await r.json()
             data = data[0]
+            name = data["name"]
             if data["download_state"] != "paused":
                 action = "pause"
             else:
