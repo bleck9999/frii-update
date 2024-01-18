@@ -131,8 +131,8 @@ class Loop(commands.Cog):
 
         return 0
 
-    @commands.command(aliases=["add_tn"])
-    async def add_tracking_number(self, ctx, number):
+    @commands.command(aliases=["cn_add", "cainiao_add_tn", "cn_add_tn"])
+    async def cainiao_add(self, ctx, number):
         self.update_state()
         number = number.upper()
         self.bot.log(f"Adding tracking number {number} (by request)")
@@ -140,16 +140,16 @@ class Loop(commands.Cog):
             return await ctx.send(f"{number} not added (duplicate)")
         await ctx.send(f"Succesfully added {number}")
 
-    @commands.command(aliases=["delete_tracking_number", "del_tn"])
-    async def del_tracking_number(self, ctx, number):
+    @commands.command(aliases=["cn_del", "cainiao_del_tn", "cn_del_tn"])
+    async def cainiao_del(self, ctx, number):
         self.update_state()
         self.bot.log(f"Deleting tracking number {number.upper()} (source: del_tn)")
         if self.modify_tns("del", number) == 2:
             return await ctx.send(f"{number} not deleted (not found)")
         await ctx.send(f"Succesfully removed {number.upper()}")
 
-    @commands.command(aliases=["list_tns"])
-    async def list_tracking_numbers(self, ctx):
+    @commands.command(aliases=["cn_list", "cainiao_list_tns", "cn_list_tns"])
+    async def cainiao_list(self, ctx):
         self.update_state()
         await ctx.send(embed=discord.Embed(title="List of saved tracking numbers", description='\n'.join(self.ids)))
 
