@@ -55,6 +55,10 @@ class Loop(commands.Cog):
             br["password"] = account[1]
             res = br.submit()
             soup = BeautifulSoup(res.get_data(), "html.parser")
+            if soup.find("h1", string="PLEASE TRY AGAIN!") is not None:
+                if self.bot.conf["Bot"]["log level"] == "debug":
+                    self.bot.log("Login failed, skipping")
+                return
             br.open(soup.find_all("meta")[3]["content"][6:])
             try:
                 br.follow_link(text="Go to mail.com mailbox with limited functionality")
