@@ -49,7 +49,7 @@ class Loop(commands.Cog):
                       apikey (str) = None : general supabase api key, is sent in the `Apikey header on requests to db.torbox.app
                       autosoc (bool) = True : whether to automatically stop watching torrents after they finish
     info.json ideally shouldn't be configured manually but if you must:
-    dict["watched": list[str]  # list of *full* names of torrents to watch
+    dict["watched": list[int]  # list of ids of torrents to watch
          "token": str          # personalised supabase token
          "refresh_token": str  # refresh token
         ]"""
@@ -282,6 +282,25 @@ class Loop(commands.Cog):
             for torrent in torrents:
                 await self.send_torrent(ctx, torrent)
 
+    @commands.command(aliases=["tr_list_files"])
+    async def torbox_list_files(self, ctx, name):
+        if await self.refresh_db_auth():
+            return await ctx.send("Authentication failed, reconfigure token")
+        tor_id = await self.fuzzy_torrent_by_name(ctx, name)
+        if not isinstance(tor_id, int):
+            return
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{self.db_url}/torrents?select=name,files&id=eq.{tor_id}",
+                            headers=self.hd_db_authed)
+            if r.status != 200:
+                await ctx.send("Failed to fetch file list")
+            data = await r.json()
+            files = data[0]["files"]
+            embed = discord.Embed()
+            embed.title = f"File listing for {data[0]['name']}"
+            embed.description = "\n".join(file["name"].split('/')[-1] for file in files)
+            await ctx.send(embed=embed)
+
     @commands.command(aliases=["tr_get_otp", "tr_get_link", "torbox_get_link"])
     async def torbox_get_otp(self, ctx, email, create_user=False):
         """Usage: `torbox_get_otp email <optional create_user>`
@@ -331,7 +350,7 @@ class Loop(commands.Cog):
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         tor_id = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(tor_id, str):
+        if not isinstance(tor_id, int):
             return
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=download_speed,upload_speed,eta,download_state,"
@@ -352,7 +371,7 @@ class Loop(commands.Cog):
         if await self.refresh_db_auth():
             return await ctx.send("Authentication failed, reconfigure token")
         tor_id = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(tor_id, str):
+        if not isinstance(tor_id, int):
             return
         if tor_id in self.watched:
             self.watched.remove(tor_id)
@@ -371,7 +390,7 @@ class Loop(commands.Cog):
             return await ctx.send("Authentication failed, reconfigure token using "
                                   "`torbox_get_link` and `torbox_get_token`")
         tor_id = await self.fuzzy_torrent_by_name(ctx, name)
-        if not isinstance(tor_id, str):
+        if not isinstance(tor_id, int):
             return
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{self.db_url}/torrents?select=name,id,auth_id,download_state&id=eq.{tor_id}",
