@@ -28,15 +28,15 @@ class TorrentState:
     @property
     def up_speed(self):
         # not sure about that last one
-        return self.state not in ["paused", "metaDL", "Completed", "stalledUP", "processing"]
+        return self.state not in ["paused", "metaDL", "Completed", "uploading (no peers)", "processing"]
 
     @property
     def progress(self):
-        return self.state in ["Completed", "uploading", "stalledUP"]
+        return self.state in ["Completed", "uploading", "uploading (no peers)"]
 
     @property
     def eta(self):
-        return self.state not in ["Completed", "paused", "uploading", "stalledUP", "processing"]
+        return self.state not in ["Completed", "paused", "uploading", "uploading (no peers)", "processing"]
 
     @property
     def download_available(self):
@@ -115,10 +115,10 @@ class Loop(commands.Cog):
         if not state.progress:
             embed.description += f"Progress: {data['progress'] * 100:.0f}%\n"
         if state.eta:
-            embed.description += f"ETA: {timedelta(seconds=data['eta'])}"
+            embed.description += f"ETA: {timedelta(seconds=data['eta'])}\n"
         if state.download_available:
             embed.description += f"Download link expiry: {timedelta(seconds=data['eta'])}\n"
-            embed.description += f"Download link: {await self.get_dl_link(data['id'], 'all')}"
+            embed.description += f"Download link: {await self.get_dl_link(data['id'], 'all')}\n"
         await ctx.send(embed=embed)
 
     async def refresh_db_auth(self):
@@ -242,7 +242,8 @@ class Loop(commands.Cog):
             data = r[0]
             if data["download_present"]:
                 # server_url = data["servers"]["download_url"]
-                root_id = data["download_path"]
+                # root_id = data["download_path"]
+                pass
             else:
                 self.bot.log(f"{tor_id}: tried to fetch download link while none present")
                 return "N/A"
@@ -252,13 +253,13 @@ class Loop(commands.Cog):
                 return "Failed to fetch API token"
 
             if mode == "all":
-                r = await s.get(f"{self.api_url}/requestzip?torrent_id={data['id']}&"
-                                f"folder_id={root_id}&token={headers['Authorization'][7:]}")
+                r = await s.get(f"{self.api_url}/requestdl?torrent_id={data['id']}&"
+                                f"zip_link=true&token={headers['Authorization'][7:]}")
                 link = await r.json()
-                if "data" in link:
+                if "success" not in link["detail"]:
                     return f'Error {r.status} - {link["data"]}'
                 else:
-                    return link["detail"]
+                    return link["data"]
             if mode == "dir":
                 pass  # todo
             elif mode == "file":
